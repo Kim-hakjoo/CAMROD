@@ -3068,6 +3068,199 @@ h1 {
 }
 
 /* ── 진단 모니터 (DiagnosticsMonitor) ───────────────────────────────────── */
+.snapshot-control-card {
+  margin: 14px 0;
+  padding: 18px;
+  border: 1px solid #d9e3dc;
+  border-radius: 14px;
+  background: #f8fbf9;
+  color: #24342a;
+}
+
+.snapshot-tab-view {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  background: #e8ece9;
+}
+
+.snapshot-tab-view .snapshot-control-card {
+  margin: 0;
+}
+
+.snapshot-control-heading,
+.snapshot-summary-row,
+.snapshot-directory-row,
+.snapshot-lookback-row,
+.snapshot-save-row,
+.snapshot-last-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.snapshot-control-heading { justify-content: space-between; }
+.snapshot-control-title { font-size: 1.05rem; font-weight: 750; }
+.snapshot-control-help,
+.snapshot-field-label,
+.snapshot-status-message { color: #607067; font-size: 0.86rem; }
+
+.snapshot-state {
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.snapshot-state.ready { background: #daf1df; color: #236239; }
+.snapshot-state.busy { background: #fff0c8; color: #775613; }
+.snapshot-state.offline { background: #f8dddd; color: #8a2e2e; }
+
+.snapshot-summary-row {
+  flex-wrap: wrap;
+  margin: 14px 0;
+  font-size: 0.84rem;
+}
+
+.snapshot-summary-row span {
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #edf3ef;
+}
+
+.snapshot-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 650;
+}
+
+.snapshot-topic-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.snapshot-topic-entry textarea,
+.snapshot-directory-row input,
+.snapshot-lookback-row input,
+.snapshot-save-row input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #bfcfc4;
+  border-radius: 9px;
+  background: #fff;
+  color: #203026;
+  font: inherit;
+}
+
+.snapshot-topic-entry textarea {
+  min-height: 76px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.snapshot-topic-entry button,
+.snapshot-directory-row button,
+.snapshot-save-row button,
+.snapshot-topic-chips button {
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.snapshot-topic-entry button,
+.snapshot-directory-row button,
+.snapshot-save-row button {
+  padding: 9px 15px;
+  background: #2f6f45;
+  color: #fff;
+}
+
+.snapshot-topic-entry button:disabled,
+.snapshot-directory-row button:disabled,
+.snapshot-save-row button:disabled,
+.snapshot-topic-chips button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.snapshot-topic-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.snapshot-topic-chips button {
+  padding: 5px 8px;
+  background: #e4eee7;
+  color: #36513f;
+  font-family: monospace;
+  font-size: 0.76rem;
+}
+
+.snapshot-directory-row,
+.snapshot-lookback-row,
+.snapshot-save-row {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr) auto auto;
+  margin-top: 15px;
+}
+
+.snapshot-directory-row label,
+.snapshot-lookback-row label,
+.snapshot-save-row label { font-size: 0.84rem; font-weight: 650; }
+.snapshot-directory-row input,
+.snapshot-lookback-row input,
+.snapshot-save-row input { padding: 9px 11px; }
+.snapshot-directory-row button.reset-directory { background: #66756b; }
+.snapshot-directory-row small,
+.snapshot-lookback-row small,
+.snapshot-save-row small {
+  grid-column: 2 / -1;
+  color: #6d786f;
+  font-size: 0.76rem;
+}
+.snapshot-lookback-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #526158;
+  font-size: 0.84rem;
+}
+.snapshot-lookback-input input { max-width: 130px; }
+.snapshot-save-row button.confirm { background: #b65d22; }
+.snapshot-save-row button.cancel { background: #78837b; }
+
+.snapshot-status-message { min-height: 1.3em; margin-top: 10px; }
+
+.snapshot-last-result {
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #edf5ef;
+  font-size: 0.78rem;
+}
+
+.snapshot-last-result.failure { background: #f8e5e3; }
+.snapshot-last-result code { overflow-wrap: anywhere; }
+.snapshot-last-result time { margin-left: auto; color: #6d786f; }
+
+@media (max-width: 760px) {
+  .snapshot-topic-entry,
+  .snapshot-directory-row,
+  .snapshot-lookback-row,
+  .snapshot-save-row { grid-template-columns: 1fr; }
+  .snapshot-topic-entry button,
+  .snapshot-directory-row button,
+  .snapshot-save-row button { min-height: 44px; }
+  .snapshot-directory-row small,
+  .snapshot-lookback-row small,
+  .snapshot-save-row small { grid-column: 1; }
+}
+
 .diag-monitor {
   display: flex;
   flex: 1;
@@ -4568,10 +4761,8 @@ h1 {
   flex-shrink: 0;
 }
 
-/* 전조등 전용 컨트롤 패널: Manual Motion 바와 같은 문법을 쓰되 상단 경계로 구분한다. */
-.light-control-bar {
-  border-top: 1px solid #2d6a4f;
-}
+/* 전조등 전용 컨트롤 패널: Manual Motion 바 바로 아래에 붙고,
+ * Manual Motion 바의 border-bottom 한 줄로만 구분한다. */
 
 .diag-control-label {
   font-family: 'Consolas', 'Menlo', monospace;

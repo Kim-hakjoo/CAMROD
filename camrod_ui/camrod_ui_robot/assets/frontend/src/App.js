@@ -23,6 +23,7 @@ import {
   ServiceTripBadge,
   useServiceMetricsSummary,
 } from './ServiceEvidence';
+import SnapshotControl from './SnapshotControl';
 
 // HH_260619 - Developer/test builds bypass the public operating-hours gate by default.
 // Enable the kiosk time gate explicitly with REACT_APP_OPERATING_HOURS_GATE_ENABLED=true.
@@ -601,7 +602,11 @@ function DiagnosticsMonitor({
   return (
     <div className="diag-monitor-wrap">
       <nav className="diag-tab-bar" aria-label="Operator diagnostics views">
-        {[{ id: 'system', label: '시스템' }, ...TELEMETRY_TABS].map(tab => (
+        {[
+          { id: 'system', label: '시스템' },
+          ...TELEMETRY_TABS,
+          { id: 'snapshot', label: '스냅샷' },
+        ].map(tab => (
           <button
             key={tab.id}
             type="button"
@@ -630,7 +635,6 @@ function DiagnosticsMonitor({
         <DockingCommandButton disabled={Boolean(motionCommandPending)} serviceStateName={serviceStateName} />
         <span className="manual-motion-status">{motionCommandStatus || '명령 대기'}</span>
       </div>
-      <p className="manual-motion-status" role="status">{parkingPolicyMessage(parkingPolicy)}</p>
 
       {/* ── 전조등 컨트롤 패널 ── */}
       {onToggleHeadlight && (
@@ -761,6 +765,10 @@ function DiagnosticsMonitor({
       </div>
     </div>
         </>
+      ) : activeTab === 'snapshot' ? (
+        <div className="snapshot-tab-view">
+          <SnapshotControl />
+        </div>
       ) : (
         <TelemetryWorkspace
           activeTab={activeTab}

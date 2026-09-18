@@ -13,6 +13,8 @@ import io
 import json
 import math
 import os
+import re
+import shutil
 import struct
 import threading
 import time
@@ -46,11 +48,13 @@ from avg_msgs.msg import (
     PlanningRecallRequest,
     PlanningState,
     SystemStatus,
+    TopicDetails,
     UiDestinationCommand,
 )
+from avg_msgs.srv import ConfigureSnapshotTopics, TriggerSnapshot
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 # HH_260721 - Keep only the FastAPI symbols used by the runtime backend.
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from geometry_msgs.msg import PoseStamped
@@ -59,6 +63,7 @@ from nav2_msgs.action import NavigateToPose
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
 from rclpy.action import ActionClient
+from rclpy.duration import Duration
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
@@ -687,6 +692,45 @@ class UiBackendNode(Node):
         self.ranger_base_node_name = str(
             self.declare_parameter("ranger_base_node_name", "/ranger_base_node").value
         ).rstrip("/")
+        self.snapshot_service_name = str(
+            self.declare_parameter(
+                "snapshot_service_name", "/trigger_snapshot"
+            ).value
+        )
+        self.snapshot_configure_service_name = str(
+            self.declare_parameter(
+                "snapshot_configure_service_name", "/configure_snapshot_topics"
+            ).value
+        )
+        self.snapshot_output_directory = Path(
+            os.path.expanduser(
+                str(
+                    self.declare_parameter(
+                        "snapshot_output_directory",
+                        "/home/avg/storage/camrod",
+                    ).value
+                )
+            )
+        ).resolve()
+        self.snapshot_request_timeout_s = max(
+            5.0,
+            min(
+                600.0,
+                float(
+                    self.declare_parameter(
+                        "snapshot_request_timeout_s", 120.0
+                    ).value
+                ),
+            ),
+        )
+        self.snapshot_minimum_free_space_mb = max(
+            0,
+            int(
+                self.declare_parameter(
+                    "snapshot_minimum_free_space_mb", 1024
+                ).value
+            ),
+        )
         self.steering_transition_parameter = str(
             self.declare_parameter(
                 "steering_transition_parameter",
@@ -1283,6 +1327,9 @@ class UiBackendNode(Node):
         self._uvicorn_server: Optional[uvicorn.Server] = None
         self._server_thread: Optional[threading.Thread] = None
         self._server_stop_requested = threading.Event()
+        self._snapshot_lock = threading.Lock()
+        self._snapshot_write_pending = False
+        self._snapshot_last_result: Dict[str, Any] = {}
 
         # Subscriptions.
         self.sub_destination = self.create_subscription(
@@ -1493,6 +1540,12 @@ class UiBackendNode(Node):
         )
         self.set_ranger_parameters_client = self.create_client(
             SetParameters, f"{self.ranger_base_node_name}/set_parameters"
+        )
+        self.snapshot_client = self.create_client(
+            TriggerSnapshot, self.snapshot_service_name
+        )
+        self.snapshot_configure_client = self.create_client(
+            ConfigureSnapshotTopics, self.snapshot_configure_service_name
         )
         # HH_260724 - UI cancel/stop must cancel the active Nav2 actions, not only close engage.
         self.nav2_cancel_clients = [
@@ -7471,13 +7524,359 @@ class UiBackendNode(Node):
             **UiBackendNode._mission_dispatch_snapshot(self),
         }
 
-    async def _await_ros_future(self, future: Any, timeout_s: float = 1.5) -> Any:
+    async def _await_ros_future(
+        self, future: Any, timeout_s: float = 1.5, operation: str = "ROS service"
+    ) -> Any:
         deadline = asyncio.get_running_loop().time() + timeout_s
         while not future.done():
             if asyncio.get_running_loop().time() >= deadline:
-                raise TimeoutError("ROS parameter service timed out")
+                raise TimeoutError(f"{operation} timed out")
             await asyncio.sleep(0.02)
         return future.result()
+
+    @staticmethod
+    def _normalize_snapshot_topics(values: Any) -> tuple[List[str], List[str]]:
+        if values is None:
+            return [], []
+        if not isinstance(values, list):
+            return [], ["topics must be a JSON array"]
+        normalized: List[str] = []
+        rejected: List[str] = []
+        for value in values[:33]:
+            name = str(value).strip()
+            if name and not name.startswith("/"):
+                name = "/" + name
+            if (
+                not name
+                or len(name) > 256
+                or re.fullmatch(r"/[A-Za-z0-9_/]+", name) is None
+            ):
+                rejected.append(name or str(value))
+                continue
+            if name not in normalized:
+                normalized.append(name)
+        if len(values) > 32:
+            rejected.append("at most 32 topics may be changed per request")
+        return normalized[:32], rejected
+
+    @staticmethod
+    def _snapshot_topic_payload(messages: Any) -> List[Dict[str, str]]:
+        return [
+            {"name": str(message.name), "type": str(message.type)}
+            for message in messages
+        ]
+
+    def _snapshot_disk_free_mb(
+        self, output_directory: Optional[Path] = None
+    ) -> Optional[int]:
+        probe = output_directory or self.snapshot_output_directory
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        try:
+            return int(shutil.disk_usage(probe).free // 1_000_000)
+        except OSError:
+            return None
+
+    def _snapshot_output_path(self, value: Any) -> Path:
+        raw_value = str(value or "").strip()
+        if not raw_value:
+            return self.snapshot_output_directory
+        if len(raw_value) > 1024 or "\x00" in raw_value:
+            raise ValueError("invalid snapshot output directory")
+
+        expanded = Path(os.path.expanduser(raw_value))
+        if not expanded.is_absolute():
+            raise ValueError(
+                "snapshot output directory must be an absolute path or start with ~"
+            )
+        output_directory = expanded.resolve()
+        if output_directory.exists() and not output_directory.is_dir():
+            raise ValueError("snapshot output directory is not a directory")
+        return output_directory
+
+    @staticmethod
+    def _snapshot_lookback_seconds(value: Any) -> Optional[float]:
+        if value is None or str(value).strip() == "":
+            return None
+        try:
+            seconds = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("snapshot lookback must be a number of seconds") from exc
+        if not math.isfinite(seconds) or seconds <= 0.0 or seconds > 300.0:
+            raise ValueError("snapshot lookback must be between 1 and 300 seconds")
+        return seconds
+
+    def _snapshot_local_state(self) -> Dict[str, Any]:
+        with self._snapshot_lock:
+            pending = bool(self._snapshot_write_pending)
+            last_result = dict(self._snapshot_last_result)
+        return {
+            "pending": pending,
+            "last_result": last_result,
+            "output_directory": str(self.snapshot_output_directory),
+            "free_space_mb": self._snapshot_disk_free_mb(),
+            "minimum_free_space_mb": self.snapshot_minimum_free_space_mb,
+        }
+
+    async def get_snapshot_status(self) -> Dict[str, Any]:
+        local = self._snapshot_local_state()
+        trigger_available = self.snapshot_client.service_is_ready()
+        configure_available = self.snapshot_configure_client.service_is_ready()
+        if not configure_available:
+            return {
+                "success": True,
+                "available": trigger_available,
+                "configure_available": False,
+                "recording": False,
+                "writing": local["pending"],
+                "active_topics": [],
+                "dynamic_topics": [],
+                "message": "snapshot topic service is unavailable",
+                **local,
+            }
+
+        request = ConfigureSnapshotTopics.Request()
+        try:
+            response = await self._await_ros_future(
+                self.snapshot_configure_client.call_async(request),
+                timeout_s=3.0,
+                operation="snapshot status service",
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "success": False,
+                "available": trigger_available,
+                "configure_available": True,
+                "recording": False,
+                "writing": local["pending"],
+                "active_topics": [],
+                "dynamic_topics": [],
+                "message": str(exc),
+                **local,
+            }
+        return {
+            "success": bool(response.success),
+            "available": trigger_available,
+            "configure_available": True,
+            "recording": bool(response.recording),
+            "writing": bool(response.writing) or local["pending"],
+            "active_topics": self._snapshot_topic_payload(response.active_topics),
+            "dynamic_topics": self._snapshot_topic_payload(response.dynamic_topics),
+            "rejected_topics": list(response.rejected_topics),
+            "message": str(response.message),
+            **local,
+        }
+
+    async def configure_snapshot_topics(
+        self, add_topics: Any = None, remove_topics: Any = None
+    ) -> Dict[str, Any]:
+        add, add_rejected = self._normalize_snapshot_topics(add_topics)
+        remove, remove_rejected = self._normalize_snapshot_topics(remove_topics)
+        invalid = add_rejected + remove_rejected
+        if invalid:
+            return {
+                "success": False,
+                "available": self.snapshot_configure_client.service_is_ready(),
+                "rejected_topics": invalid,
+                "message": "invalid snapshot topic request",
+            }
+        if not add and not remove:
+            return {
+                "success": False,
+                "available": self.snapshot_configure_client.service_is_ready(),
+                "rejected_topics": [],
+                "message": "at least one topic is required",
+            }
+        if not self.snapshot_configure_client.service_is_ready():
+            return {
+                "success": False,
+                "available": False,
+                "rejected_topics": add + remove,
+                "message": "snapshot topic service is unavailable",
+            }
+
+        request = ConfigureSnapshotTopics.Request()
+        request.add_topics = add
+        request.remove_topics = remove
+        try:
+            response = await self._await_ros_future(
+                self.snapshot_configure_client.call_async(request),
+                timeout_s=5.0,
+                operation="snapshot topic service",
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "success": False,
+                "available": False,
+                "rejected_topics": add + remove,
+                "message": str(exc),
+            }
+        return {
+            "success": bool(response.success),
+            "available": True,
+            "recording": bool(response.recording),
+            "writing": bool(response.writing),
+            "active_topics": self._snapshot_topic_payload(response.active_topics),
+            "dynamic_topics": self._snapshot_topic_payload(response.dynamic_topics),
+            "rejected_topics": list(response.rejected_topics),
+            "message": str(response.message),
+        }
+
+    def _finish_timed_out_snapshot(self, future: Any, output_path: Path) -> None:
+        try:
+            response = future.result()
+            result = {
+                "success": bool(response.success),
+                "path": str(output_path),
+                "message": str(response.message),
+                "completed_at": time.time(),
+            }
+        except Exception as exc:  # noqa: BLE001
+            result = {
+                "success": False,
+                "path": str(output_path),
+                "message": str(exc),
+                "completed_at": time.time(),
+            }
+        with self._snapshot_lock:
+            self._snapshot_write_pending = False
+            self._snapshot_last_result = result
+
+    async def trigger_snapshot(
+        self,
+        label: Any = "",
+        selected_topics: Any = None,
+        output_directory: Any = None,
+        lookback_seconds: Any = None,
+    ) -> Dict[str, Any]:
+        if not self.snapshot_client.service_is_ready():
+            return {
+                "success": False,
+                "available": False,
+                "message": "snapshot service is unavailable",
+            }
+        with self._snapshot_lock:
+            if self._snapshot_write_pending:
+                return {
+                    "success": False,
+                    "available": True,
+                    "busy": True,
+                    "message": "a snapshot write is already in progress",
+                }
+            self._snapshot_write_pending = True
+
+        output_path: Optional[Path] = None
+        future = None
+        try:
+            selected_output_directory = self._snapshot_output_path(output_directory)
+            selected_output_directory.mkdir(parents=True, exist_ok=True)
+            free_mb = self._snapshot_disk_free_mb(selected_output_directory)
+            if (
+                free_mb is None
+                or free_mb < self.snapshot_minimum_free_space_mb
+            ):
+                return {
+                    "success": False,
+                    "available": True,
+                    "insufficient_storage": True,
+                    "free_space_mb": free_mb,
+                    "minimum_free_space_mb": self.snapshot_minimum_free_space_mb,
+                    "message": "insufficient disk space for snapshot",
+                }
+
+            normalized_topics, rejected = self._normalize_snapshot_topics(
+                selected_topics
+            )
+            if rejected:
+                return {
+                    "success": False,
+                    "available": True,
+                    "rejected_topics": rejected,
+                    "message": "invalid selected snapshot topics",
+                }
+
+            active_by_name: Dict[str, str] = {}
+            if normalized_topics:
+                status = await self.get_snapshot_status()
+                active_by_name = {
+                    item["name"]: item["type"]
+                    for item in status.get("active_topics", [])
+                }
+                missing = [name for name in normalized_topics if name not in active_by_name]
+                if missing:
+                    return {
+                        "success": False,
+                        "available": True,
+                        "rejected_topics": missing,
+                        "message": "selected topics are not being buffered",
+                    }
+
+            safe_label = re.sub(
+                r"[^0-9A-Za-z가-힣_-]+", "_", str(label).strip()
+            ).strip("_")[:48]
+            stamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+            suffix = f"_{safe_label}" if safe_label else ""
+            output_path = selected_output_directory / f"snapshot_{stamp}{suffix}.bag"
+            collision = 1
+            while output_path.exists():
+                output_path = selected_output_directory / (
+                    f"snapshot_{stamp}{suffix}_{collision}.bag"
+                )
+                collision += 1
+
+            request = TriggerSnapshot.Request()
+            request.filename = str(output_path)
+            request.topics = [
+                TopicDetails(name=name, type=active_by_name[name])
+                for name in normalized_topics
+            ]
+            normalized_lookback = self._snapshot_lookback_seconds(lookback_seconds)
+            if normalized_lookback is not None:
+                request.start_time = (
+                    self.get_clock().now() - Duration(seconds=normalized_lookback)
+                ).to_msg()
+            future = self.snapshot_client.call_async(request)
+            try:
+                response = await self._await_ros_future(
+                    future,
+                    timeout_s=self.snapshot_request_timeout_s,
+                    operation="snapshot write service",
+                )
+            except TimeoutError as exc:
+                future.add_done_callback(
+                    lambda completed: self._finish_timed_out_snapshot(
+                        completed, output_path
+                    )
+                )
+                return {
+                    "success": False,
+                    "available": True,
+                    "busy": True,
+                    "path": str(output_path),
+                    "message": str(exc) + "; write may still be running",
+                }
+
+            result = {
+                "success": bool(response.success),
+                "available": True,
+                "path": str(output_path),
+                "message": str(response.message),
+                "completed_at": time.time(),
+            }
+            with self._snapshot_lock:
+                self._snapshot_last_result = dict(result)
+            return result
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "success": False,
+                "available": self.snapshot_client.service_is_ready(),
+                "path": str(output_path) if output_path else "",
+                "message": str(exc),
+            }
+        finally:
+            if future is None or future.done():
+                with self._snapshot_lock:
+                    self._snapshot_write_pending = False
 
     async def get_platform_tuning(self) -> Dict[str, Any]:
         if not self.get_ranger_parameters_client.service_is_ready():
@@ -7809,6 +8208,69 @@ class UiBackendNode(Node):
             with node._lock:
                 diags = list(node._state.diagnostics)
             return JSONResponse({"status": diags})
+
+        @app.get("/api/admin/snapshot/status")
+        async def get_snapshot_status() -> JSONResponse:
+            result = await node.get_snapshot_status()
+            return JSONResponse(result, status_code=200)
+
+        @app.post("/api/admin/snapshot/topics")
+        async def add_snapshot_topics(request: Request) -> JSONResponse:
+            try:
+                payload = await request.json()
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            result = await node.configure_snapshot_topics(
+                add_topics=payload.get("topics")
+            )
+            status = 200 if result.get("success") else (
+                503 if not result.get("available", False) else 400
+            )
+            return JSONResponse(result, status_code=status)
+
+        @app.delete("/api/admin/snapshot/topics")
+        async def remove_snapshot_topics(request: Request) -> JSONResponse:
+            try:
+                payload = await request.json()
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            result = await node.configure_snapshot_topics(
+                remove_topics=payload.get("topics")
+            )
+            status = 200 if result.get("success") else (
+                503 if not result.get("available", False) else 400
+            )
+            return JSONResponse(result, status_code=status)
+
+        @app.post("/api/admin/snapshot")
+        async def post_snapshot(request: Request) -> JSONResponse:
+            try:
+                payload = await request.json()
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            result = await node.trigger_snapshot(
+                label=payload.get("label", ""),
+                selected_topics=payload.get("topics"),
+                output_directory=payload.get("output_directory"),
+                lookback_seconds=payload.get("lookback_seconds"),
+            )
+            if result.get("success"):
+                status = 200
+            elif result.get("busy"):
+                status = 409
+            elif result.get("insufficient_storage"):
+                status = 507
+            elif not result.get("available", False):
+                status = 503
+            else:
+                status = 400
+            return JSONResponse(result, status_code=status)
 
         # HH_260819 - A compact endpoint keeps the always-visible KPI strip
         # inexpensive; history is fetched only while its evidence modal is open.

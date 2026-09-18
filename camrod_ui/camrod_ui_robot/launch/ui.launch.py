@@ -158,6 +158,21 @@ def generate_launch_description():
         default_value=default_frontend_dir,
         description='Static frontend directory for UI backend',
     )
+    snapshot_output_directory_arg = DeclareLaunchArgument(
+        'snapshot_output_directory',
+        default_value='/home/avg/storage/camrod',
+        description='Server-owned directory for administrator snapshot bags',
+    )
+    snapshot_request_timeout_s_arg = DeclareLaunchArgument(
+        'snapshot_request_timeout_s',
+        default_value='120.0',
+        description='Maximum UI wait for a snapshot bag write',
+    )
+    snapshot_minimum_free_space_mb_arg = DeclareLaunchArgument(
+        'snapshot_minimum_free_space_mb',
+        default_value='1024',
+        description='Minimum free disk space before accepting a snapshot write',
+    )
     camping_sites_yaml_arg = DeclareLaunchArgument(
         'camping_sites_yaml',
         default_value=default_camping_sites_yaml,
@@ -297,6 +312,17 @@ def generate_launch_description():
             'host': LaunchConfiguration('ui_host'),
             'port': LaunchConfiguration('ui_port'),
             'frontend_dir': LaunchConfiguration('frontend_dir'),
+            'snapshot_output_directory': LaunchConfiguration(
+                'snapshot_output_directory'
+            ),
+            'snapshot_request_timeout_s': ParameterValue(
+                LaunchConfiguration('snapshot_request_timeout_s'),
+                value_type=float,
+            ),
+            'snapshot_minimum_free_space_mb': ParameterValue(
+                LaunchConfiguration('snapshot_minimum_free_space_mb'),
+                value_type=int,
+            ),
             'enable_operator_telemetry': ParameterValue(
                 LaunchConfiguration('enable_operator_telemetry'),
                 value_type=bool,
@@ -475,6 +501,9 @@ def generate_launch_description():
         operator_ui_window_height_arg,
         operator_ui_window_fullscreen_arg,
         frontend_dir_arg,
+        snapshot_output_directory_arg,
+        snapshot_request_timeout_s_arg,
+        snapshot_minimum_free_space_mb_arg,
         camping_sites_yaml_arg,
         drop_zones_yaml_arg,
         enable_campsite_occupancy_guard_arg,
