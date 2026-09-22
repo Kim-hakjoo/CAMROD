@@ -944,6 +944,28 @@ function FacilityContent() {
 }
 
 // ── 대기 화면 우측 버튼 및 모달 콘텐츠 정의 ───────────────────────────────
+// HJ_260922 - 안전 안내 포스터는 [서비스 선택] 진입 직전에서만 보여준다.
+// [로봇 이용 방법]은 여러 번 여는 참고 자료라 매번 관문을 거치게 하지 않는다.
+function SafetyNoticePanel({ onConfirm }) {
+  return (
+    <div className="usage-safety-intro">
+      <img
+        src={`${process.env.PUBLIC_URL}/로봇안전안내.png`}
+        alt="로봇 주행 안전 수칙 안내"
+        className="usage-safety-image"
+      />
+      <button
+        type="button"
+        className="usage-safety-confirm"
+        data-ui="usage-safety-confirm"
+        onClick={onConfirm}
+      >
+        확인
+      </button>
+    </div>
+  );
+}
+
 const SIDE_BUTTONS = [
   {
     id: 'usage',
@@ -984,46 +1006,46 @@ const SIDE_BUTTONS = [
             <span>서비스 선택 방법</span>
           </div>
           <div className="guide-card-body">
-            {[
-              '대기 화면의 서비스 선택에서 배송 또는 이용객 호출을 선택합니다.',
-              '서비스 안내를 확인한 뒤 원하는 사이트(B1 ~ B13)를 선택합니다.',
-              '목적지 이미지와 "이동하시겠습니까?" 를 확인합니다.',
-              '[예] 버튼을 누르고 사이트명을 입력해 로봇 출발을 확정합니다.',
-            ].map((text, i) => (
-              <div key={i} className="guide-step">
-                <span className="guide-step-num" style={{ background: '#2d6e40' }}>{i + 1}</span>
-                <span>{text}</span>
+            <figure className="guide-card-visual">
+              <img
+                src={`${process.env.PUBLIC_URL}/guide/service-selection.png`}
+                alt="배달 서비스와 호출 서비스를 선택하는 화면"
+              />
+              <figcaption>서비스 선택 화면</figcaption>
+            </figure>
+            <div className="guide-card-copy">
+              <div className="guide-service-definition guide-service-delivery">
+                <div>
+                  <strong>배달 서비스</strong>
+                  <span>캠핑 시작</span>
+                </div>
+                <p>캠핑을 시작할 때 사용합니다. 드랍존의 캠핑 장비를 선택한 캠핑 사이트 안으로 운반합니다.</p>
               </div>
-            ))}
+              <div className="guide-service-definition guide-service-recall">
+                <div>
+                  <strong>호출 서비스</strong>
+                  <span>캠핑 종료</span>
+                </div>
+                <p>캠핑을 마칠 때 사용합니다. 로봇을 사이트 도로 측 대기점으로 호출해 장비를 싣고 드랍존으로 복귀합니다.</p>
+              </div>
+              <div className="guide-service-admin-notice" role="note">
+                <span aria-hidden="true">🔒</span>
+                <p><strong>[충전] 버튼은 관리자 전용 기능입니다.</strong> 이용객은 누르거나 조작하지 마세요.</p>
+              </div>
+              {[
+                '대기 화면에서 [서비스 선택]을 누른 뒤 이용 목적에 맞는 서비스를 고릅니다.',
+                '사이트(B1~B13)와 안내를 확인하고 [예]를 누른 뒤 사이트명을 입력합니다.',
+              ].map((text, i) => (
+                <div key={i} className="guide-step">
+                  <span className="guide-step-num" style={{ background: '#2d6e40' }}>{i + 1}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ── 2. 주의 사항 ── */}
-        <div className="guide-card">
-          <div className="guide-card-header" style={{ background: 'linear-gradient(135deg,#e65100,#ff8f00)' }}>
-            <svg viewBox="0 0 32 32" fill="none">
-              <polygon points="16,4 29,27 3,27" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" fill="none"/>
-              <line x1="16" y1="13" x2="16" y2="20" stroke="#fff" strokeWidth="2.4" strokeLinecap="round"/>
-              <circle cx="16" cy="23.5" r="1.4" fill="#fff"/>
-            </svg>
-            <span>주의 사항</span>
-          </div>
-          <div className="guide-card-body">
-            {[
-              '배송 로봇 이동 중에는 경로 접근을 최소화해 주세요.',
-              '경로 위의 장애물은 미리 치워 주세요.',
-              '어린이·반려동물이 배송 로봇 주변에 가까이 가지 않도록 주의해주세요.',
-              '로봇이 이동중에 목적지 변경은 불가능하니 신중히 선택해 주세요.',
-            ].map((text, i) => (
-              <div key={i} className="guide-bullet">
-                <span className="guide-bullet-dot" style={{ color: '#e65100' }}>⚠</span>
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── 3. 로봇 정지 방법 ── */}
+        {/* ── 2. 로봇 정지 방법 ── */}
         <div className="guide-card">
           <div className="guide-card-header" style={{ background: 'linear-gradient(135deg,#b71c1c,#e53935)' }}>
             <svg viewBox="0 0 32 32" fill="none">
@@ -1033,39 +1055,25 @@ const SIDE_BUTTONS = [
             <span>로봇 정지 방법</span>
           </div>
           <div className="guide-card-body">
-            {[
-              '배송 로봇 이동 중 왼쪽 프리뷰 패널 하단을 확인합니다.',
-              '"운행을 정지하시겠습니까?" 아래의 [예] 버튼을 누릅니다.',
-              '배송 로봇이 즉시 운행을 멈추고 목적지 ON 상태가 해제됩니다.',
-            ].map((text, i) => (
-              <div key={i} className="guide-step">
-                <span className="guide-step-num" style={{ background: '#b71c1c' }}>{i + 1}</span>
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── 4. 재출발 방법 ── */}
-        <div className="guide-card">
-          <div className="guide-card-header" style={{ background: 'linear-gradient(135deg,#1565c0,#1e88e5)' }}>
-            <svg viewBox="0 0 32 32" fill="none">
-              <path d="M26 16 A10 10 0 1 1 20.5 7" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-              <polygon points="20,3 26,8 20,13" fill="#fff"/>
-            </svg>
-            <span>재출발 방법</span>
-          </div>
-          <div className="guide-card-body">
-            {[
-              '운행 정지 또는 목적지 도착 후 ON 상태가 해제됩니다.',
-              '목적지 선택 패널에서 원하는 목적지를 다시 선택합니다.',
-              '프리뷰에서 이미지 확인 후 [예]를 눌러 재출발합니다.',
-            ].map((text, i) => (
-              <div key={i} className="guide-step">
-                <span className="guide-step-num" style={{ background: '#1565c0' }}>{i + 1}</span>
-                <span>{text}</span>
-              </div>
-            ))}
+            <figure className="guide-card-visual">
+              <img
+                src={`${process.env.PUBLIC_URL}/guide/robot-stop.png`}
+                alt="운행 정지 안내와 예 버튼이 표시된 주행 화면"
+              />
+              <figcaption>주행 화면의 정지 버튼</figcaption>
+            </figure>
+            <div className="guide-card-copy">
+              {[
+                '로봇 이동 중 왼쪽 화면에서 “운행을 정지하시겠습니까?”를 확인합니다.',
+                '문구 아래의 빨간색 [예] 버튼을 누릅니다.',
+                '화면에 “운행이 정지되었습니다”가 표시되는지 확인합니다.',
+              ].map((text, i) => (
+                <div key={i} className="guide-step">
+                  <span className="guide-step-num" style={{ background: '#b71c1c' }}>{i + 1}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1297,6 +1305,8 @@ function App() {
   });
   const [showWaiting, setShowWaiting] = useState(true); // 대기 화면 표시 여부
   const [showServiceSelection, setShowServiceSelection] = useState(false);
+  // 서비스 선택 전 안전 안내를 보여주는 중인지 여부
+  const [showServiceSafetyGate, setShowServiceSafetyGate] = useState(false);
   const wsRef = useRef(null);
   // Treat every reconnect as a new authority channel. Callbacks from a closed
   // socket must never roll the current mission back to an older snapshot.
@@ -1526,15 +1536,22 @@ function App() {
   // ── 대기 화면 터치 핸들러 (운영시간 체크) ──────────────────────────────
   const handleWaitingClick = () => {
     if (isWithinOperatingHours()) {
-      // Pin the public chooser immediately, not only after role selection:
-      // idle station heartbeats are status, not navigation commands.
-      intentPinnedRef.current = true;
-      setShowServiceSelection(true);
-      setShowWaiting(false);
+      // 안전 수칙을 먼저 보여주고, [확인]을 누른 뒤에만 서비스 선택으로 넘긴다.
+      setShowServiceSafetyGate(true);
     } else {
       setOutsideHoursMsg(true);
       setTimeout(() => setOutsideHoursMsg(false), 3000);
     }
+  };
+
+  // 안전 안내 확인 → 배송 서비스 선택 화면
+  const handleServiceSafetyConfirm = () => {
+    setShowServiceSafetyGate(false);
+    // Pin the public chooser immediately, not only after role selection:
+    // idle station heartbeats are status, not navigation commands.
+    intentPinnedRef.current = true;
+    setShowServiceSelection(true);
+    setShowWaiting(false);
   };
 
   // ── 모든 토글이 OFF이면 10초 후 대기 화면으로 복귀 ──────────────────────
@@ -1583,6 +1600,8 @@ function App() {
   // service menu instead of inheriting the previous role.
   useEffect(() => {
     if (showWaiting) intentPinnedRef.current = false;
+    // 대기 화면이 바뀔 때마다 안전 안내를 닫아, 다음 이용객이 다시 처음부터 본다.
+    setShowServiceSafetyGate(false);
   }, [showWaiting]);
 
   // An accepted or already-running mission must always show the live control
@@ -2625,6 +2644,26 @@ function App() {
 
         {/* ── 모달 오버레이 ── */}
         {serviceEvidenceModal}
+
+        {/* ── 서비스 선택 전 안전 안내 ── */}
+        {showServiceSafetyGate && (
+          <div className="modal-overlay" data-ui="service-safety-gate">
+            <div className="modal-box" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <span className="modal-title">로봇 안전 안내</span>
+                <button
+                  className="modal-back-btn"
+                  onClick={() => setShowServiceSafetyGate(false)}
+                >
+                  뒤로가기
+                </button>
+              </div>
+              <div className="modal-body">
+                <SafetyNoticePanel onConfirm={handleServiceSafetyConfirm} />
+              </div>
+            </div>
+          </div>
+        )}
         {activeModal && activeModal !== 'settings' && modalData && (
           <div className="modal-overlay">
             <div className="modal-box" onClick={e => e.stopPropagation()}>

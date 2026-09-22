@@ -64,6 +64,71 @@ class RobotUiFrontendContractTest(unittest.TestCase):
         self.assertIn("if (isReturning && showWaiting)", self.source)
         self.assertIn("setShowWaiting(false);", self.source)
 
+    def test_usage_guide_opens_straight_onto_two_sections(self) -> None:
+        # 참고 자료는 관문 없이 바로 열린다. 안전 안내는 [서비스 선택] 직전에만 남아 있다.
+        self.assertNotIn("UsageGuideGate", self.source)
+
+        usage_start = self.source.index("id: 'usage'")
+        usage_end = self.source.index("id: 'facility'", usage_start)
+        usage = self.source[usage_start:usage_end]
+
+        self.assertNotIn("/로봇안전안내.png", usage)
+        for heading in ("서비스 선택 방법", "로봇 정지 방법"):
+            self.assertEqual(usage.count(f"<span>{heading}</span>"), 1)
+        self.assertNotIn("<span>주의 사항</span>", usage)
+        self.assertNotIn("재출발 방법", usage)
+
+        for image_name in (
+            "service-selection.png",
+            "robot-stop.png",
+        ):
+            self.assertIn(f"/guide/{image_name}", usage)
+            self.assertTrue((PUBLIC_ASSETS / "guide" / image_name).is_file())
+        self.assertNotIn("/guide/destination-safety.png", usage)
+        self.assertIn("캠핑을 시작할 때 사용합니다", usage)
+        self.assertIn("캠핑을 마칠 때 사용합니다", usage)
+        self.assertIn("드랍존으로 복귀합니다", usage)
+        self.assertIn("[충전] 버튼은 관리자 전용 기능입니다", usage)
+        self.assertIn("이용객은 누르거나 조작하지 마세요", usage)
+
+        guide_grid = re.search(r"\.guide-grid\s*\{([^}]*)\}", self.css)
+        self.assertIsNotNone(guide_grid)
+        self.assertIn(
+            "grid-template-columns: minmax(0, 1fr);",
+            guide_grid.group(1),
+        )
+        self.assertIn(".usage-safety-intro", self.css)
+        self.assertIn(".usage-safety-image", self.css)
+        self.assertIn(".usage-safety-confirm", self.css)
+        self.assertIn(".guide-card-visual", self.css)
+        self.assertIn(".guide-card-copy", self.css)
+        self.assertIn(".guide-service-admin-notice", self.css)
+
+    def test_service_selection_requires_safety_confirmation(self) -> None:
+        # [서비스 선택]은 안전 안내를 거친 뒤에만 배송 서비스 선택으로 넘어간다.
+        self.assertIn("const [showServiceSafetyGate, setShowServiceSafetyGate]", self.source)
+        self.assertIn('data-ui="service-safety-gate"', self.source)
+        self.assertIn("<SafetyNoticePanel onConfirm={handleServiceSafetyConfirm} />", self.source)
+
+        panel_start = self.source.index("function SafetyNoticePanel(")
+        panel_end = self.source.index("const SIDE_BUTTONS", panel_start)
+        panel = self.source[panel_start:panel_end]
+        self.assertIn("/로봇안전안내.png", panel)
+        self.assertIn('data-ui="usage-safety-confirm"', panel)
+        self.assertTrue((PUBLIC_ASSETS / "로봇안전안내.png").is_file())
+
+        handler_start = self.source.index("const handleWaitingClick = () => {")
+        handler_end = self.source.index("const resetIdleTimer", handler_start)
+        handler = self.source[handler_start:handler_end]
+        self.assertIn("setShowServiceSafetyGate(true);", handler)
+
+        confirm_start = self.source.index("const handleServiceSafetyConfirm = () => {")
+        confirm_end = self.source.index("};", confirm_start)
+        confirm = self.source[confirm_start:confirm_end]
+        self.assertIn("setShowServiceSafetyGate(false);", confirm)
+        self.assertIn("setShowServiceSelection(true);", confirm)
+        self.assertIn("setShowWaiting(false);", confirm)
+
     def test_parking_and_charging_lifecycle_has_distinct_english_labels(self) -> None:
         for label in (
             "Charging",
@@ -110,9 +175,11 @@ class RobotUiFrontendContractTest(unittest.TestCase):
         )
 
     def test_destination_entry_opens_three_block_service_menu(self) -> None:
+        # 대기 화면 → 안전 안내 → 서비스 선택까지가 한 흐름이다.
         handler_start = self.source.index("const handleWaitingClick = () => {")
-        handler_end = self.source.index("};", handler_start)
+        handler_end = self.source.index("const resetIdleTimer", handler_start)
         handler = self.source[handler_start:handler_end]
+        self.assertIn("setShowServiceSafetyGate(true);", handler)
         self.assertIn("setShowServiceSelection(true);", handler)
         self.assertIn("setShowWaiting(false);", handler)
 
