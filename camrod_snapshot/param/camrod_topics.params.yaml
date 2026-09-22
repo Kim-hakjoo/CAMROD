@@ -10,6 +10,115 @@
     # Set to 0.0 (here or per topic with "interval") to store every message.
     default_min_interval: 0.2
 
+    # --- offload finished bags to shared storage ---
+    # HH_260921 - Both the trigger service and an automatic capture end in the
+    # same write path, so an operator snapshot and an auto-trigger snapshot are
+    # transferred alike. The transfer runs on its own thread: the service
+    # response returns as soon as the bag is on local disk, and a slow link
+    # never delays the next capture.
+    #
+    # Requires key-based SSH: the transfer runs with BatchMode=yes and will
+    # never prompt. Install the key first, e.g.
+    #   ssh-copy-id -p 8008 admin@220.90.18.50
+    offload:
+      enabled: true
+      host: "220.90.18.50"
+      port: 8008
+      user: "admin"
+      remote_directory: "/volume1/home/admin/camrod/storage"
+      # Empty uses the agent or the default key for the node's user.
+      identity_file: ""
+      # true makes this a move. A failed transfer never removes anything, so
+      # the local bag survives as the only copy until it is delivered.
+      remove_local_after_transfer: true
+      connect_timeout_s: 10
+      transfer_timeout_s: 1800
+      retries: 2
+      retry_delay_s: 30
+
+    # --- automatic evidence capture ---
+    # HH_260921 - The snapshotter stays domain-agnostic: it matches the typed
+    # operating_state/level fields of a status topic and knows nothing about
+    # what produced them, so the policy lives here rather than in C++. Rules
+    # never parse the free-text status message, whose format may change.
+    auto_trigger:
+      enabled: true
+      output_directory: "/home/avg/storage/camrod"
+      filename_prefix: "autosnapshot"
+      # 0.0 follows default_duration_limit. A write pauses recording and clears
+      # every buffer afterwards, so a second capture inside one buffer length
+      # would record almost nothing - exactly what a fault cascade produces.
+      cooldown_s: 0.0
+      # Second, independent startup guard. require_healthy_first below is the
+      # primary one; this only covers a graph that flaps through a healthy
+      # window while it is still coming up.
+      startup_grace_s: 90.0
+      # 0.0 writes the whole buffer.
+      lookback_s: 0.0
+      # Mirrors the operator UI storage policy so an automatic bag leaves the
+      # same filesystem reserve a manual one does.
+      minimum_free_space_mb: 5120
+      minimum_free_space_ratio: 0.10
+      size_safety_factor: 1.30
+      # Rule order is priority: only one capture is taken per cooldown window,
+      # and the first rule in this list that has tripped wins it.
+      rules: ["system_error", "gate_fault_hold", "route_boundary_repeat_contact"]
+      rule:
+        # A brief ERROR is a dropped heartbeat; a sustained one is a fault.
+        system_error:
+          topic: "/system/status"
+          kind: "system_status"
+          on_system_not_ok: true
+          min_level: 2
+          hold_s: 10.0
+          # Boot ordering reaches ERROR before it reaches OK, so a startup
+          # fault is excluded by the shape of the transition rather than by
+          # guessing how long boot takes: the rule cannot fire until the
+          # system has reported healthy for 15 s at least once.
+          require_healthy_first: true
+          require_healthy_s: 15.0
+        # FAULT_HOLD means estop, an abnormal vehicle_state or a platform
+        # error - hardware faults, not ordinary holds - so one is already
+        # worth a bag and this rule does not count. It also sits above
+        # ROUTE_SAFETY_HOLD in the gate's own state chain, so it covers a
+        # lanelet contact that coincides with a platform fault and would
+        # otherwise be reported as FAULT_HOLD and missed by the rule below.
+        gate_fault_hold:
+          topic: "/control/cmd_vel_safety_gate/status"
+          kind: "module_state"
+          operating_states: ["FAULT_HOLD"]
+          hold_s: 2.0
+          # Deliberately unscoped: a platform fault inside a campsite or at
+          # the charger matters just as much as one on the road.
+          require_healthy_first: true
+          require_healthy_s: 5.0
+
+        # A margin-boundary contact with the lanelet map clears itself: the
+        # robot crabs back toward the lane centre within a second, so there is
+        # no sustained state to wait out and hold_s stays 0. One contact is
+        # also ordinary - cmd_vel_safety_gate budgets 50 automatic releases.
+        # Repetition inside a single delivery is the real signal, so count the
+        # ROUTE_SAFETY_HOLD rising edges while the robot is driving the road
+        # legs, and clear the count when the next delivery departs.
+        route_boundary_repeat_contact:
+          topic: "/control/cmd_vel_safety_gate/status"
+          kind: "module_state"
+          operating_states: ["ROUTE_SAFETY_HOLD"]
+          hold_s: 0.0
+          min_occurrences: 2
+          scope_topic: "/service/state"
+          scope_kind: "service_state"
+          # Only the two road legs count. A campsite or charger-bay contact is
+          # expected: those areas sit outside the road lanelets by design, and
+          # cmd_vel_safety_gate already lets the campsite/parking/drop-zone
+          # maneuver phases cross that boundary.
+          scope_active_states: ["MOVING_TO_SITE", "RETURNING_TO_DROP_ZONE"]
+          # One delivery = the outbound leg plus its return leg, so the count
+          # clears only when the next delivery departs.
+          scope_reset_states: ["MOVING_TO_SITE"]
+          require_healthy_first: true
+          require_healthy_s: 5.0
+
     topics: [
       # --- system / service health ---
       "/rosout",

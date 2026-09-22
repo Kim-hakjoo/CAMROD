@@ -59,3 +59,199 @@ def test_bringup_owns_and_forwards_snapshot_configuration():
     assert "bringup_cfg(cfg_get(" in launch_source
     assert "'params_file': lc['snapshot_param_file']" in launch_source
     assert "'camrod_snapshot.launch.py'" in launch_source
+
+
+# HH_260921 - Automatic evidence capture lives in camrod_snapshot, but the
+# policy it applies is configuration. Pin the decisions that are easy to
+# regress by editing the YAML.
+
+SNAPSHOT_PACKAGE_CONFIG = (
+    PACKAGE_ROOT.parent / "camrod_snapshot" / "param" / "camrod_topics.params.yaml"
+)
+
+
+def _auto_trigger(config_path=SNAPSHOT_CONFIG):
+    params = yaml.safe_load(config_path.read_text(encoding="utf-8"))["/**"][
+        "ros__parameters"
+    ]
+    return params["auto_trigger"]
+
+
+def test_auto_trigger_rules_are_declared_and_well_formed():
+    auto_trigger = _auto_trigger()
+    rules = auto_trigger["rules"]
+
+    assert auto_trigger["enabled"] is True
+    assert len(rules) == len(set(rules))
+    # Rule names become part of the bag filename; the node rejects anything else.
+    assert all(rule.replace("_", "").replace("-", "").isalnum() for rule in rules)
+    assert set(rules) == set(auto_trigger["rule"])
+
+    for name in rules:
+        rule = auto_trigger["rule"][name]
+        assert rule["topic"].startswith("/"), name
+        assert rule["kind"] in {"module_state", "system_status"}, name
+        # Every rule needs some debounce, but which kind depends on the shape
+        # of the event: a sustained condition waits (hold_s), a self-clearing
+        # one counts (min_occurrences). Neither would spend the buffer freely.
+        assert rule["hold_s"] >= 0.0, name
+        assert rule["hold_s"] > 0.0 or rule.get("min_occurrences", 1) > 1, name
+        conditions = (
+            rule.get("operating_states"),
+            rule.get("min_level", -1) >= 0 or None,
+            rule.get("on_system_not_ok") or None,
+        )
+        assert any(conditions), name
+
+
+def test_startup_faults_cannot_write_a_bag():
+    auto_trigger = _auto_trigger()
+
+    # Boot ordering reaches ERROR before it ever reaches OK, so a cold-start
+    # fault is excluded by the shape of the transition rather than by guessing
+    # how long boot takes: a rule stays disarmed until its topic has reported
+    # healthy. startup_grace_s is only the second, independent guard.
+    assert auto_trigger["startup_grace_s"] > 0.0
+    for name in auto_trigger["rules"]:
+        rule = auto_trigger["rule"][name]
+        assert rule["require_healthy_first"] is True, name
+        assert rule["require_healthy_s"] > 0.0, name
+
+
+def test_auto_capture_cooldown_covers_one_whole_buffer():
+    params = _snapshot_parameters()
+
+    # A write pauses recording and clears every buffer, so a second capture
+    # inside one buffer length would record almost nothing. 0.0 tells the node
+    # to inherit default_duration_limit.
+    assert params["auto_trigger"]["cooldown_s"] == 0.0
+    assert params["default_duration_limit"] == 300.0
+    # Module ERROR is routine during boot ordering.
+    assert params["auto_trigger"]["startup_grace_s"] > 0.0
+
+
+def test_lanelet_contact_is_counted_not_waited_out():
+    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
+
+    # The robot crabs back toward the lane centre within about a second of a
+    # margin-boundary contact, so there is no sustained state to wait out: a
+    # hold_s here would simply never be reached.
+    assert rule["topic"] == "/control/cmd_vel_safety_gate/status"
+    assert rule["operating_states"] == ["ROUTE_SAFETY_HOLD"]
+    assert rule["hold_s"] == 0.0
+
+    # One contact is ordinary - cmd_vel_safety_gate budgets 50 automatic
+    # releases for it. Repetition within a single delivery is the signal.
+    assert rule["min_occurrences"] >= 2
+
+
+def test_only_road_leg_contacts_are_counted():
+    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
+
+    # Campsites, the charger bay and the drop zone sit outside the road
+    # lanelets by design: motion_cost_stop gives the campsite, parking and
+    # drop-zone maneuver phases an explicit lanelet bypass. Counting contacts
+    # there would count intended behaviour, so only the road legs are live.
+    assert rule["scope_topic"] == "/service/state"
+    assert rule["scope_kind"] == "service_state"
+    assert set(rule["scope_active_states"]) == {
+        "MOVING_TO_SITE",
+        "RETURNING_TO_DROP_ZONE",
+    }
+    assert "SITE_ENTRY" not in rule["scope_active_states"]
+    assert "DROP_ZONE_PARKING" not in rule["scope_active_states"]
+
+
+def test_platform_faults_capture_immediately_and_everywhere():
+    auto_trigger = _auto_trigger()
+    rule = auto_trigger["rule"]["gate_fault_hold"]
+
+    # FAULT_HOLD is estop, an abnormal vehicle_state or a platform error.
+    # Those are hardware faults rather than ordinary holds, so one is already
+    # worth a bag and it is never traded against a contact count.
+    assert rule["operating_states"] == ["FAULT_HOLD"]
+    assert rule.get("min_occurrences", 1) == 1
+    # Deliberately unscoped: a platform fault inside a campsite or at the
+    # charger matters as much as one on the road.
+    assert "scope_topic" not in rule
+    assert "scope_active_states" not in rule
+
+    # FAULT_HOLD outranks ROUTE_SAFETY_HOLD in the gate's own state chain, so
+    # a contact coinciding with a platform fault is reported as FAULT_HOLD.
+    # This rule is what keeps that case from going uncaptured, and it must win
+    # the shared cooldown window against the contact rule.
+    rules = auto_trigger["rules"]
+    assert rules.index("gate_fault_hold") < rules.index("route_boundary_repeat_contact")
+
+
+def test_contact_count_is_bounded_by_one_delivery():
+    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
+
+    # One delivery is the outbound leg plus its return leg, so the count
+    # clears when the next delivery departs. Without that bound it would
+    # accumulate across deliveries until it tripped on unrelated contacts.
+    assert rule["scope_reset_states"] == ["MOVING_TO_SITE"]
+
+
+def test_every_counting_rule_declares_its_scope():
+    auto_trigger = _auto_trigger()
+    for name in auto_trigger["rules"]:
+        rule = auto_trigger["rule"][name]
+        if rule.get("min_occurrences", 1) > 1:
+            assert rule.get("scope_topic"), name
+            assert rule.get("scope_reset_states"), name
+
+
+def test_bringup_and_package_snapshot_configs_stay_in_sync():
+    # camrod_snapshot ships a standalone fallback that its launch file prefers
+    # bringup's copy over. They must not drift.
+    assert SNAPSHOT_PACKAGE_CONFIG.is_file()
+    assert yaml.safe_load(
+        SNAPSHOT_PACKAGE_CONFIG.read_text(encoding="utf-8")
+    ) == yaml.safe_load(SNAPSHOT_CONFIG.read_text(encoding="utf-8"))
+
+
+
+# HH_260921 - Finished bags are moved to shared storage. Pin the parts of that
+# policy that are easy to get wrong by editing the YAML.
+
+
+def _offload(config_path=SNAPSHOT_CONFIG):
+    return yaml.safe_load(config_path.read_text(encoding="utf-8"))["/**"][
+        "ros__parameters"
+    ]["offload"]
+
+
+def test_offload_targets_shared_storage_over_ssh():
+    offload = _offload()
+
+    assert offload["enabled"] is True
+    assert offload["host"]
+    assert offload["port"] == 8008
+    assert offload["user"] == "admin"
+    assert offload["remote_directory"] == "/volume1/home/admin/camrod/storage"
+    assert offload["remote_directory"].startswith("/")
+
+
+def test_offload_never_leaves_a_bag_without_a_copy():
+    offload = _offload()
+
+    # remove_local_after_transfer makes this a move, which is only safe
+    # because the local bag is removed after a verified transfer and never
+    # after a failed one. Retries and bounded timeouts keep a stalled link
+    # from silently dropping evidence.
+    assert offload["retries"] >= 1
+    assert offload["connect_timeout_s"] >= 1
+    assert offload["transfer_timeout_s"] >= 1
+    assert offload["retry_delay_s"] >= 0
+
+
+def test_offload_carries_no_secret():
+    # The transfer runs with BatchMode=yes and authenticates with a key, so no
+    # password may ever appear in configuration.
+    offload = _offload()
+    for key, value in offload.items():
+        assert "password" not in key.lower(), key
+        assert "passwd" not in key.lower(), key
+        if isinstance(value, str):
+            assert "@" not in value or key == "host", key

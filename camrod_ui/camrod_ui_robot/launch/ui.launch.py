@@ -170,8 +170,18 @@ def generate_launch_description():
     )
     snapshot_minimum_free_space_mb_arg = DeclareLaunchArgument(
         'snapshot_minimum_free_space_mb',
-        default_value='1024',
-        description='Minimum free disk space before accepting a snapshot write',
+        default_value='5120',
+        description='Absolute minimum free disk space preserved by snapshot writes',
+    )
+    snapshot_minimum_free_space_ratio_arg = DeclareLaunchArgument(
+        'snapshot_minimum_free_space_ratio',
+        default_value='0.10',
+        description='Filesystem fraction preserved by snapshot writes',
+    )
+    snapshot_size_safety_factor_arg = DeclareLaunchArgument(
+        'snapshot_size_safety_factor',
+        default_value='1.30',
+        description='Serialized-buffer to on-disk snapshot size safety factor',
     )
     camping_sites_yaml_arg = DeclareLaunchArgument(
         'camping_sites_yaml',
@@ -322,6 +332,14 @@ def generate_launch_description():
             'snapshot_minimum_free_space_mb': ParameterValue(
                 LaunchConfiguration('snapshot_minimum_free_space_mb'),
                 value_type=int,
+            ),
+            'snapshot_minimum_free_space_ratio': ParameterValue(
+                LaunchConfiguration('snapshot_minimum_free_space_ratio'),
+                value_type=float,
+            ),
+            'snapshot_size_safety_factor': ParameterValue(
+                LaunchConfiguration('snapshot_size_safety_factor'),
+                value_type=float,
             ),
             'enable_operator_telemetry': ParameterValue(
                 LaunchConfiguration('enable_operator_telemetry'),
@@ -504,6 +522,8 @@ def generate_launch_description():
         snapshot_output_directory_arg,
         snapshot_request_timeout_s_arg,
         snapshot_minimum_free_space_mb_arg,
+        snapshot_minimum_free_space_ratio_arg,
+        snapshot_size_safety_factor_arg,
         camping_sites_yaml_arg,
         drop_zones_yaml_arg,
         enable_campsite_occupancy_guard_arg,

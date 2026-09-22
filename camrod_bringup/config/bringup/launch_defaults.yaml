@@ -36,7 +36,9 @@ bringup:
     param_file: snapshot/camrod_topics.params.yaml
     output_directory: /home/avg/storage/camrod
     request_timeout_s: 120.0
-    minimum_free_space_mb: 1024
+    minimum_free_space_mb: 5120
+    minimum_free_space_ratio: 0.10
+    size_safety_factor: 1.30
 
   # =========================================================================
   # 2. LOCALIZATION

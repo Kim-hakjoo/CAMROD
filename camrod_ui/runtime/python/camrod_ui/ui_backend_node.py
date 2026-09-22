@@ -51,7 +51,7 @@ from avg_msgs.msg import (
     TopicDetails,
     UiDestinationCommand,
 )
-from avg_msgs.srv import ConfigureSnapshotTopics, TriggerSnapshot
+from avg_msgs.srv import ConfigureSnapshotTopics, EstimateSnapshot, TriggerSnapshot
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 # HH_260721 - Keep only the FastAPI symbols used by the runtime backend.
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -702,6 +702,11 @@ class UiBackendNode(Node):
                 "snapshot_configure_service_name", "/configure_snapshot_topics"
             ).value
         )
+        self.snapshot_estimate_service_name = str(
+            self.declare_parameter(
+                "snapshot_estimate_service_name", "/estimate_snapshot"
+            ).value
+        )
         self.snapshot_output_directory = Path(
             os.path.expanduser(
                 str(
@@ -727,8 +732,30 @@ class UiBackendNode(Node):
             0,
             int(
                 self.declare_parameter(
-                    "snapshot_minimum_free_space_mb", 1024
+                    "snapshot_minimum_free_space_mb", 5120
                 ).value
+            ),
+        )
+        self.snapshot_minimum_free_space_ratio = max(
+            0.0,
+            min(
+                0.9,
+                float(
+                    self.declare_parameter(
+                        "snapshot_minimum_free_space_ratio", 0.10
+                    ).value
+                ),
+            ),
+        )
+        self.snapshot_size_safety_factor = max(
+            1.0,
+            min(
+                3.0,
+                float(
+                    self.declare_parameter(
+                        "snapshot_size_safety_factor", 1.30
+                    ).value
+                ),
             ),
         )
         self.steering_transition_parameter = str(
@@ -1546,6 +1573,9 @@ class UiBackendNode(Node):
         )
         self.snapshot_configure_client = self.create_client(
             ConfigureSnapshotTopics, self.snapshot_configure_service_name
+        )
+        self.snapshot_estimate_client = self.create_client(
+            EstimateSnapshot, self.snapshot_estimate_service_name
         )
         # HH_260724 - UI cancel/stop must cancel the active Nav2 actions, not only close engage.
         self.nav2_cancel_clients = [
@@ -7535,14 +7565,16 @@ class UiBackendNode(Node):
         return future.result()
 
     @staticmethod
-    def _normalize_snapshot_topics(values: Any) -> tuple[List[str], List[str]]:
+    def _normalize_snapshot_topics(
+        values: Any, max_topics: int = 32
+    ) -> tuple[List[str], List[str]]:
         if values is None:
             return [], []
         if not isinstance(values, list):
             return [], ["topics must be a JSON array"]
         normalized: List[str] = []
         rejected: List[str] = []
-        for value in values[:33]:
+        for value in values[:max_topics + 1]:
             name = str(value).strip()
             if name and not name.startswith("/"):
                 name = "/" + name
@@ -7555,9 +7587,11 @@ class UiBackendNode(Node):
                 continue
             if name not in normalized:
                 normalized.append(name)
-        if len(values) > 32:
-            rejected.append("at most 32 topics may be changed per request")
-        return normalized[:32], rejected
+        if len(values) > max_topics:
+            rejected.append(
+                f"at most {max_topics} topics may be included per request"
+            )
+        return normalized[:max_topics], rejected
 
     @staticmethod
     def _snapshot_topic_payload(messages: Any) -> List[Dict[str, str]]:
@@ -7566,16 +7600,71 @@ class UiBackendNode(Node):
             for message in messages
         ]
 
-    def _snapshot_disk_free_mb(
+    def _snapshot_graph_topic_payload(self) -> List[Dict[str, Any]]:
+        """Return every topic currently visible in the ROS graph for the UI."""
+        try:
+            graph_topics = self.get_topic_names_and_types()
+            # rclpy returns ``List[Tuple[str, List[str]]]``. Accept a mapping as
+            # well so the helper remains usable with simple test doubles.
+            topic_pairs = (
+                graph_topics.items()
+                if isinstance(graph_topics, dict)
+                else graph_topics
+            )
+            return [
+                {
+                    "name": str(name),
+                    "type": str(types[0]) if len(types) == 1 else ", ".join(types),
+                    "selectable": len(types) == 1,
+                }
+                for name, types in sorted(topic_pairs, key=lambda item: item[0])
+            ]
+        except Exception:  # noqa: BLE001 - graph discovery is best effort
+            return []
+
+    def _snapshot_disk_usage(
         self, output_directory: Optional[Path] = None
-    ) -> Optional[int]:
+    ) -> Optional[Any]:
         probe = output_directory or self.snapshot_output_directory
         while not probe.exists() and probe != probe.parent:
             probe = probe.parent
         try:
-            return int(shutil.disk_usage(probe).free // 1_000_000)
+            return shutil.disk_usage(probe)
         except OSError:
             return None
+
+    def _snapshot_disk_free_mb(
+        self, output_directory: Optional[Path] = None
+    ) -> Optional[int]:
+        usage = self._snapshot_disk_usage(output_directory)
+        return None if usage is None else int(usage.free // 1_000_000)
+
+    def _snapshot_storage_budget(
+        self, output_directory: Optional[Path] = None
+    ) -> Dict[str, int]:
+        usage = self._snapshot_disk_usage(output_directory)
+        if usage is None:
+            return {
+                "total_bytes": 0,
+                "free_bytes": 0,
+                "reserve_bytes": 0,
+                "writable_bytes": 0,
+                "serialized_budget_bytes": 0,
+            }
+        reserve_bytes = max(
+            self.snapshot_minimum_free_space_mb * 1_000_000,
+            int(usage.total * self.snapshot_minimum_free_space_ratio),
+        )
+        writable_bytes = max(0, usage.free - reserve_bytes)
+        return {
+            "total_bytes": int(usage.total),
+            "free_bytes": int(usage.free),
+            "reserve_bytes": int(reserve_bytes),
+            "writable_bytes": int(writable_bytes),
+            "serialized_budget_bytes": int(
+                writable_bytes / self.snapshot_size_safety_factor
+            ),
+        }
 
     def _snapshot_output_path(self, value: Any) -> Path:
         raw_value = str(value or "").strip()
@@ -7610,16 +7699,21 @@ class UiBackendNode(Node):
         with self._snapshot_lock:
             pending = bool(self._snapshot_write_pending)
             last_result = dict(self._snapshot_last_result)
+        storage = self._snapshot_storage_budget()
         return {
             "pending": pending,
             "last_result": last_result,
             "output_directory": str(self.snapshot_output_directory),
-            "free_space_mb": self._snapshot_disk_free_mb(),
+            "free_space_mb": int(storage["free_bytes"] // 1_000_000),
             "minimum_free_space_mb": self.snapshot_minimum_free_space_mb,
+            "reserve_space_mb": int(storage["reserve_bytes"] // 1_000_000),
+            "writable_space_mb": int(storage["writable_bytes"] // 1_000_000),
+            "size_safety_factor": self.snapshot_size_safety_factor,
         }
 
     async def get_snapshot_status(self) -> Dict[str, Any]:
         local = self._snapshot_local_state()
+        available_topics = self._snapshot_graph_topic_payload()
         trigger_available = self.snapshot_client.service_is_ready()
         configure_available = self.snapshot_configure_client.service_is_ready()
         if not configure_available:
@@ -7631,6 +7725,7 @@ class UiBackendNode(Node):
                 "writing": local["pending"],
                 "active_topics": [],
                 "dynamic_topics": [],
+                "available_topics": available_topics,
                 "message": "snapshot topic service is unavailable",
                 **local,
             }
@@ -7651,6 +7746,7 @@ class UiBackendNode(Node):
                 "writing": local["pending"],
                 "active_topics": [],
                 "dynamic_topics": [],
+                "available_topics": available_topics,
                 "message": str(exc),
                 **local,
             }
@@ -7662,6 +7758,7 @@ class UiBackendNode(Node):
             "writing": bool(response.writing) or local["pending"],
             "active_topics": self._snapshot_topic_payload(response.active_topics),
             "dynamic_topics": self._snapshot_topic_payload(response.dynamic_topics),
+            "available_topics": available_topics,
             "rejected_topics": list(response.rejected_topics),
             "message": str(response.message),
             **local,
@@ -7742,12 +7839,133 @@ class UiBackendNode(Node):
             self._snapshot_write_pending = False
             self._snapshot_last_result = result
 
+    @staticmethod
+    def _snapshot_stamp_seconds(stamp: Any) -> float:
+        return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+    async def estimate_snapshot(
+        self,
+        selected_topics: Any = None,
+        output_directory: Any = None,
+        lookback_seconds: Any = None,
+        auto_fit: Any = True,
+    ) -> Dict[str, Any]:
+        if not self.snapshot_estimate_client.service_is_ready():
+            return {
+                "success": False,
+                "available": False,
+                "message": "snapshot estimate service is unavailable",
+            }
+
+        try:
+            selected_output_directory = self._snapshot_output_path(output_directory)
+            normalized_lookback = self._snapshot_lookback_seconds(lookback_seconds)
+        except ValueError as exc:
+            return {"success": False, "available": True, "message": str(exc)}
+
+        normalized_topics, rejected = self._normalize_snapshot_topics(
+            selected_topics, max_topics=1024
+        )
+        if rejected:
+            return {
+                "success": False,
+                "available": True,
+                "rejected_topics": rejected,
+                "message": "invalid selected snapshot topics",
+            }
+
+        status = await self.get_snapshot_status()
+        active_by_name = {
+            item["name"]: item["type"]
+            for item in status.get("active_topics", [])
+        }
+        if not normalized_topics:
+            normalized_topics = sorted(active_by_name)
+        missing = [name for name in normalized_topics if name not in active_by_name]
+        if missing:
+            return {
+                "success": False,
+                "available": True,
+                "rejected_topics": missing,
+                "message": "selected topics are not being buffered",
+            }
+
+        storage = self._snapshot_storage_budget(selected_output_directory)
+        if storage["total_bytes"] <= 0:
+            return {
+                "success": False,
+                "available": True,
+                "message": "snapshot output filesystem capacity is unavailable",
+            }
+        if storage["writable_bytes"] <= 0:
+            return {
+                "success": False,
+                "available": True,
+                "insufficient_storage": True,
+                "message": "filesystem safety reserve leaves no writable snapshot space",
+                **storage,
+            }
+
+        request = EstimateSnapshot.Request()
+        request.topics = [
+            TopicDetails(name=name, type=active_by_name[name])
+            for name in normalized_topics
+        ]
+        if normalized_lookback is not None:
+            request.start_time = (
+                self.get_clock().now() - Duration(seconds=normalized_lookback)
+            ).to_msg()
+        automatic = bool(auto_fit)
+        request.max_bytes = (
+            storage["serialized_budget_bytes"] if automatic else 0
+        )
+        try:
+            response = await self._await_ros_future(
+                self.snapshot_estimate_client.call_async(request),
+                timeout_s=5.0,
+                operation="snapshot estimate service",
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "success": False,
+                "available": False,
+                "message": str(exc),
+            }
+
+        requested_disk_bytes = int(
+            math.ceil(response.requested_bytes * self.snapshot_size_safety_factor)
+        )
+        selected_disk_bytes = int(
+            math.ceil(response.selected_bytes * self.snapshot_size_safety_factor)
+        )
+        actual_start = self._snapshot_stamp_seconds(response.actual_start_time)
+        newest = self._snapshot_stamp_seconds(response.newest_time)
+        return {
+            "success": bool(response.success),
+            "available": True,
+            "auto_fit": automatic,
+            "requested_bytes": int(response.requested_bytes),
+            "selected_bytes": int(response.selected_bytes),
+            "requested_disk_bytes": requested_disk_bytes,
+            "selected_disk_bytes": selected_disk_bytes,
+            "message_count": int(response.message_count),
+            "actual_lookback_seconds": max(0.0, newest - actual_start),
+            "truncated": bool(response.truncated),
+            "fits_without_truncation": requested_disk_bytes <= storage["writable_bytes"],
+            "projected_free_bytes": max(
+                0, storage["free_bytes"] - selected_disk_bytes
+            ),
+            "message": str(response.message),
+            **storage,
+        }
+
     async def trigger_snapshot(
         self,
         label: Any = "",
         selected_topics: Any = None,
         output_directory: Any = None,
         lookback_seconds: Any = None,
+        auto_fit: Any = True,
     ) -> Dict[str, Any]:
         if not self.snapshot_client.service_is_ready():
             return {
@@ -7770,22 +7988,12 @@ class UiBackendNode(Node):
         try:
             selected_output_directory = self._snapshot_output_path(output_directory)
             selected_output_directory.mkdir(parents=True, exist_ok=True)
-            free_mb = self._snapshot_disk_free_mb(selected_output_directory)
-            if (
-                free_mb is None
-                or free_mb < self.snapshot_minimum_free_space_mb
-            ):
-                return {
-                    "success": False,
-                    "available": True,
-                    "insufficient_storage": True,
-                    "free_space_mb": free_mb,
-                    "minimum_free_space_mb": self.snapshot_minimum_free_space_mb,
-                    "message": "insufficient disk space for snapshot",
-                }
 
+            # Topic configuration mutations stay deliberately small, but a
+            # snapshot selection commonly contains the complete 74-topic base
+            # profile. Allow the UI to submit that explicit selection.
             normalized_topics, rejected = self._normalize_snapshot_topics(
-                selected_topics
+                selected_topics, max_topics=1024
             )
             if rejected:
                 return {
@@ -7794,6 +8002,8 @@ class UiBackendNode(Node):
                     "rejected_topics": rejected,
                     "message": "invalid selected snapshot topics",
                 }
+
+            normalized_lookback = self._snapshot_lookback_seconds(lookback_seconds)
 
             active_by_name: Dict[str, str] = {}
             if normalized_topics:
@@ -7810,6 +8020,28 @@ class UiBackendNode(Node):
                         "rejected_topics": missing,
                         "message": "selected topics are not being buffered",
                     }
+
+            estimate = await self.estimate_snapshot(
+                selected_topics=normalized_topics,
+                output_directory=str(selected_output_directory),
+                lookback_seconds=normalized_lookback,
+                auto_fit=auto_fit,
+            )
+            if not estimate.get("success", False):
+                return estimate
+            if (
+                not bool(auto_fit)
+                and not estimate.get("fits_without_truncation", False)
+            ):
+                return {
+                    **estimate,
+                    "success": False,
+                    "insufficient_storage": True,
+                    "message": (
+                        "requested snapshot would cross the filesystem safety reserve; "
+                        "enable automatic fitting or shorten the lookback"
+                    ),
+                }
 
             safe_label = re.sub(
                 r"[^0-9A-Za-z가-힣_-]+", "_", str(label).strip()
@@ -7830,11 +8062,16 @@ class UiBackendNode(Node):
                 TopicDetails(name=name, type=active_by_name[name])
                 for name in normalized_topics
             ]
-            normalized_lookback = self._snapshot_lookback_seconds(lookback_seconds)
             if normalized_lookback is not None:
                 request.start_time = (
                     self.get_clock().now() - Duration(seconds=normalized_lookback)
                 ).to_msg()
+            request.max_bytes = (
+                int(estimate["serialized_budget_bytes"])
+                if bool(auto_fit)
+                else 0
+            )
+            request.minimum_free_bytes = int(estimate["reserve_bytes"])
             future = self.snapshot_client.call_async(request)
             try:
                 response = await self._await_ros_future(
@@ -7862,6 +8099,14 @@ class UiBackendNode(Node):
                 "path": str(output_path),
                 "message": str(response.message),
                 "completed_at": time.time(),
+                "requested_bytes": int(response.requested_bytes),
+                "selected_bytes": int(response.selected_bytes),
+                "message_count": int(response.message_count),
+                "truncated": bool(response.truncated),
+                "actual_lookback_seconds": estimate.get(
+                    "actual_lookback_seconds", normalized_lookback
+                ),
+                "reserve_bytes": int(estimate["reserve_bytes"]),
             }
             with self._snapshot_lock:
                 self._snapshot_last_result = dict(result)
@@ -8246,6 +8491,27 @@ class UiBackendNode(Node):
             )
             return JSONResponse(result, status_code=status)
 
+        @app.post("/api/admin/snapshot/estimate")
+        async def estimate_snapshot(request: Request) -> JSONResponse:
+            try:
+                payload = await request.json()
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {}
+            result = await node.estimate_snapshot(
+                selected_topics=payload.get("topics"),
+                output_directory=payload.get("output_directory"),
+                lookback_seconds=payload.get("lookback_seconds"),
+                auto_fit=payload.get("auto_fit", True),
+            )
+            status = 200 if result.get("success") else (
+                507 if result.get("insufficient_storage") else (
+                    503 if not result.get("available", False) else 400
+                )
+            )
+            return JSONResponse(result, status_code=status)
+
         @app.post("/api/admin/snapshot")
         async def post_snapshot(request: Request) -> JSONResponse:
             try:
@@ -8259,6 +8525,7 @@ class UiBackendNode(Node):
                 selected_topics=payload.get("topics"),
                 output_directory=payload.get("output_directory"),
                 lookback_seconds=payload.get("lookback_seconds"),
+                auto_fit=payload.get("auto_fit", True),
             )
             if result.get("success"):
                 status = 200

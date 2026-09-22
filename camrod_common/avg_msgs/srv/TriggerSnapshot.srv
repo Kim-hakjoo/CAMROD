@@ -9,6 +9,8 @@ builtin_interfaces/Time start_time   # Earliest timestamp for a message to be in
                                      # If time(0), start at the earliest message in each topic's buffer
 builtin_interfaces/Time stop_time    # Latest timestamp for a message to be included in written bag
                                      # If time(0), stop at the most recent message in each topic's buffer
+uint64 max_bytes                     # Serialized byte budget. 0 disables automatic fitting.
+uint64 minimum_free_bytes            # Abort before the output filesystem drops below this reserve.
 
 ---
 
@@ -16,3 +18,8 @@ bool success                         # True if snapshot successfully written to 
 
 string NO_DATA_MESSAGE=no messages buffered on selected topics
 string message                       # Error description if failed
+uint64 requested_bytes               # Requested serialized bytes before automatic fitting
+uint64 selected_bytes                # Serialized bytes selected for writing
+uint64 message_count                 # Messages selected for writing
+builtin_interfaces/Time actual_start_time
+bool truncated                       # True when only the newest data fit max_bytes
