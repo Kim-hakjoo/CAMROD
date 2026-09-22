@@ -762,6 +762,13 @@ void Snapshotter::writeSnapshot(
 
   // Store if we were recording prior to write to restore this state after write
   bool recording_prior{true};
+  // HH_260922 - Only a write that actually opened the bag leaves a gap worth
+  // clearing for. Every pre-flight rejection below - no data, a byte budget
+  // that fits nothing, an unavailable filesystem reserve - happens in the time
+  // it takes to stat the buffer and the disk, so the buffer is still coherent.
+  // Discarding it there would cost the operator the very history the snapshot
+  // was meant to preserve, and on a full disk that history is irreplaceable.
+  bool bag_opened{false};
 
   {
     std::unique_lock<std::shared_mutex> write_lock(state_lock_);
@@ -784,7 +791,7 @@ void Snapshotter::writeSnapshot(
     // Turn off writing flag and return recording to its state before writing
     writing_ = false;
     if (recording_prior) {
-      this->resume();
+      this->resume(bag_opened);
     }
   );
 
@@ -820,6 +827,9 @@ void Snapshotter::writeSnapshot(
     storage_options.uri = req->filename;
     storage_options.max_bagfile_duration = bagfile_split_duration_s_;
     bag_writer.open(storage_options);
+    // From here on the pause has lasted as long as a bag write, and messages
+    // were dropped meanwhile, so the buffer is no longer continuous.
+    bag_opened = true;
   } catch (const std::exception & ex) {
     res->success = false;
     res->message = "Unable to open file for writing.";
@@ -997,11 +1007,16 @@ void Snapshotter::pause()
   recording_ = false;
 }
 
-void Snapshotter::resume()
+void Snapshotter::resume(const bool clear_buffers)
 {
-  clear();
+  if (clear_buffers) {
+    clear();
+  }
   recording_ = true;
-  RCLCPP_INFO(get_logger(), "Buffering resumed and old data cleared.");
+  const char * const note = clear_buffers ?
+    "Buffering resumed and old data cleared." :
+    "Buffering resumed with the existing buffer intact.";
+  RCLCPP_INFO(get_logger(), "%s", note);
 }
 
 void Snapshotter::enableCb(

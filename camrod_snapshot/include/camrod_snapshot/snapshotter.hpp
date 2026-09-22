@@ -441,8 +441,10 @@ private:
   );
   // Set recording_ to false and do nessesary cleaning, CALLER MUST OBTAIN LOCK
   void pause();
-  // Set recording_ to true and do nesessary cleaning, CALLER MUST OBTAIN LOCK
-  void resume();
+  // Set recording_ to true and do nesessary cleaning, CALLER MUST OBTAIN LOCK.
+  // `clear_buffers` is false when the write never began: a rejected snapshot
+  // must not cost the operator the history it was meant to preserve.
+  void resume(bool clear_buffers = true);
   // Poll master for new topics
   void pollTopics();
   selected_buffers_t selectBuffers(const std::vector<DetailsMsg> & requested_topics);

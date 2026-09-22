@@ -106,6 +106,14 @@ pause/estimate/disk-reserve behaviour and cannot overlap. The write runs on its
 own thread, so `trigger_snapshot` and `estimate_snapshot` stay answerable while
 a capture is in progress.
 
+A snapshot that is **rejected before the bag is opened** — no buffered data, a
+byte budget too small for even the newest message, or an unavailable filesystem
+reserve — leaves the buffer untouched. Those checks take as long as a stat of
+the buffer and the disk, so the history is still continuous, and discarding it
+would cost the operator exactly what the snapshot was meant to preserve. Only a
+write that actually opened the bag clears the buffer afterwards, because the
+pause then lasted long enough to drop messages and leave a real gap.
+
 Guards keep a capture rare, because **writing a snapshot pauses recording and
 clears every buffer afterwards** — an unthrottled trigger would spend the
 history on the first event of a cascade and record nothing for the rest:
