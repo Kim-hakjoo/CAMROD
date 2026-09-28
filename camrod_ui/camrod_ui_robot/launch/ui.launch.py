@@ -160,7 +160,7 @@ def generate_launch_description():
     )
     snapshot_output_directory_arg = DeclareLaunchArgument(
         'snapshot_output_directory',
-        default_value='/home/avg/storage/camrod',
+        default_value='/home/nvidia/storage/camrod',
         description='Server-owned directory for administrator snapshot bags',
     )
     snapshot_request_timeout_s_arg = DeclareLaunchArgument(

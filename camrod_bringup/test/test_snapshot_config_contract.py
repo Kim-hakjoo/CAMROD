@@ -130,36 +130,11 @@ def test_auto_capture_cooldown_covers_one_whole_buffer():
     assert params["auto_trigger"]["startup_grace_s"] > 0.0
 
 
-def test_lanelet_contact_is_counted_not_waited_out():
-    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
+def test_lanelet_contact_does_not_trigger_an_automatic_snapshot():
+    auto_trigger = _auto_trigger()
 
-    # The robot crabs back toward the lane centre within about a second of a
-    # margin-boundary contact, so there is no sustained state to wait out: a
-    # hold_s here would simply never be reached.
-    assert rule["topic"] == "/control/cmd_vel_safety_gate/status"
-    assert rule["operating_states"] == ["ROUTE_SAFETY_HOLD"]
-    assert rule["hold_s"] == 0.0
-
-    # One contact is ordinary - cmd_vel_safety_gate budgets 50 automatic
-    # releases for it. Repetition within a single delivery is the signal.
-    assert rule["min_occurrences"] >= 2
-
-
-def test_only_road_leg_contacts_are_counted():
-    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
-
-    # Campsites, the charger bay and the drop zone sit outside the road
-    # lanelets by design: motion_cost_stop gives the campsite, parking and
-    # drop-zone maneuver phases an explicit lanelet bypass. Counting contacts
-    # there would count intended behaviour, so only the road legs are live.
-    assert rule["scope_topic"] == "/service/state"
-    assert rule["scope_kind"] == "service_state"
-    assert set(rule["scope_active_states"]) == {
-        "MOVING_TO_SITE",
-        "RETURNING_TO_DROP_ZONE",
-    }
-    assert "SITE_ENTRY" not in rule["scope_active_states"]
-    assert "DROP_ZONE_PARKING" not in rule["scope_active_states"]
+    assert "route_boundary_repeat_contact" not in auto_trigger["rules"]
+    assert "route_boundary_repeat_contact" not in auto_trigger["rule"]
 
 
 def test_platform_faults_capture_immediately_and_everywhere():
@@ -176,21 +151,7 @@ def test_platform_faults_capture_immediately_and_everywhere():
     assert "scope_topic" not in rule
     assert "scope_active_states" not in rule
 
-    # FAULT_HOLD outranks ROUTE_SAFETY_HOLD in the gate's own state chain, so
-    # a contact coinciding with a platform fault is reported as FAULT_HOLD.
-    # This rule is what keeps that case from going uncaptured, and it must win
-    # the shared cooldown window against the contact rule.
-    rules = auto_trigger["rules"]
-    assert rules.index("gate_fault_hold") < rules.index("route_boundary_repeat_contact")
-
-
-def test_contact_count_is_bounded_by_one_delivery():
-    rule = _auto_trigger()["rule"]["route_boundary_repeat_contact"]
-
-    # One delivery is the outbound leg plus its return leg, so the count
-    # clears when the next delivery departs. Without that bound it would
-    # accumulate across deliveries until it tripped on unrelated contacts.
-    assert rule["scope_reset_states"] == ["MOVING_TO_SITE"]
+    assert "gate_fault_hold" in auto_trigger["rules"]
 
 
 def test_every_counting_rule_declares_its_scope():

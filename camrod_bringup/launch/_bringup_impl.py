@@ -671,7 +671,7 @@ def generate_launch_description():
             cfg_get(
                 launch_cfg,
                 'snapshot/output_directory',
-                '/home/avg/storage/camrod',
+                '/home/nvidia/storage/camrod',
             ),
             'Server-owned directory for Robot UI snapshot bags',
         ),

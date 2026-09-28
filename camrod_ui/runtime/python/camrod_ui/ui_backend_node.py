@@ -712,7 +712,7 @@ class UiBackendNode(Node):
                 str(
                     self.declare_parameter(
                         "snapshot_output_directory",
-                        "/home/avg/storage/camrod",
+                        "/home/nvidia/storage/camrod",
                     ).value
                 )
             )

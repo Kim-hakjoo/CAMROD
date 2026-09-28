@@ -163,7 +163,7 @@ shorter than the tick period is still counted.
   ros__parameters:
     auto_trigger:
       enabled: true
-      output_directory: "/home/avg/storage/camrod"   # [Required when enabled]
+      output_directory: "/home/nvidia/storage/camrod"  # [Required when enabled]
       filename_prefix: "autosnapshot"                # <prefix>_<rule>_<datetime>.bag
       cooldown_s: 0.0                                # 0 = default_duration_limit
       startup_grace_s: 90.0                          # secondary startup guard
