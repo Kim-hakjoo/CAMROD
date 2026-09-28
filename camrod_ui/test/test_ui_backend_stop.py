@@ -347,10 +347,15 @@ class UiBackendStopTest(unittest.TestCase):
             # HH_260910 - The real method now opens engage/drive-enable via
             # `before_release` right before the RETURN publish, both gated
             # behind the same voice cue; simulate that same ordering here.
+            # HH_260916 - Record the announced cue too: the same RETURN
+            # operation starts campsite re-entry for one caller and the actual
+            # drop-zone trip for the other, and only the latter may speak.
             _publish_camping_site_maneuver_controller_return=(
-                lambda source, before_release=None: (
+                lambda source, before_release=None, voice_keys=(
+                    "navigation.to_dropzone",
+                ): (
                     before_release() if before_release else None,
-                    events.append(("controller_return", source)),
+                    events.append(("controller_return", source, tuple(voice_keys))),
                 )
             ),
             _publish_service_state=lambda *args, **kwargs: self.fail(
@@ -371,6 +376,10 @@ class UiBackendStopTest(unittest.TestCase):
         self.assertEqual(second["transition"], "return_already_accepted")
         self.assertEqual([event[0] for event in events], ["engage", "controller_return"])
         self.assertEqual(events[0], ("engage", True))
+        # HH_260916 - Loading completion sends the robot *into* the campsite to
+        # turn around, so it must not announce the drop-zone return. That cue
+        # belongs to the Return button pressed after the turn.
+        self.assertEqual(events[1][2], ())
         self.assertEqual(backend._active_mission_source, "guest:dispatch:r=current")
 
         # Profiles with mission-engage publication disabled still need the
@@ -413,10 +422,15 @@ class UiBackendStopTest(unittest.TestCase):
             # HH_260910 - The real method now opens engage/drive-enable via
             # `before_release` right before the RETURN publish, both gated
             # behind the same voice cue; simulate that same ordering here.
+            # HH_260916 - Record the announced cue too: the same RETURN
+            # operation starts campsite re-entry for one caller and the actual
+            # drop-zone trip for the other, and only the latter may speak.
             _publish_camping_site_maneuver_controller_return=(
-                lambda source, before_release=None: (
+                lambda source, before_release=None, voice_keys=(
+                    "navigation.to_dropzone",
+                ): (
                     before_release() if before_release else None,
-                    events.append(("controller_return", source)),
+                    events.append(("controller_return", source, tuple(voice_keys))),
                 )
             ),
             _schedule_broadcast=lambda payload: None,
@@ -435,6 +449,9 @@ class UiBackendStopTest(unittest.TestCase):
         self.assertEqual(
             [event[0] for event in events], ["engage", "controller_return"]
         )
+        # HH_260916 - This is the real drop-zone trip, so it keeps the cue that
+        # campsite re-entry above must not use.
+        self.assertEqual(events[1][2], ("navigation.to_dropzone",))
 
     def test_robot_guest_completion_rejects_wrong_site_generation_and_early_return(self) -> None:
         for site, generation, state, source in (
@@ -701,7 +718,7 @@ class UiBackendStopTest(unittest.TestCase):
             ),
             pub_planning_return_to_drop_zone=Publisher(),
             _publish_camping_site_maneuver_controller_return=(
-                lambda source: events.append(("site_exit", source))
+                lambda source, **kwargs: events.append(("site_exit", source))
             ),
             _publish_service_state=(
                 lambda state, source: events.append(("state", state, source))

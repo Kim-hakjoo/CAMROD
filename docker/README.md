@@ -1,109 +1,35 @@
-# CAMROD Docker Guide
+# CAMROD Docker 참고 자료
 
-This folder is now intentionally minimal and focused on one production path:
-**build and run the full CAMROD bringup image**.
+이 폴더의 Docker 정의는 과거 배포 실험을 보존한 자료다. **v2.2.8 전체 이미지 빌드와 실행은 검증되지 않았다.** 현재 소스의 기본 빌드 방법은 저장소 루트의 [colcon_build.sh](../colcon_build.sh)와 [프로젝트 README](../README.md)를 따른다.
 
-## Why There Were Many Similar Files
+## 실제 파일 구성
 
-Historically, this folder had mixed experiments:
+| 파일 | 역할과 현재 상태 |
+| --- | --- |
+| [Dockerfile.camrod](Dockerfile.camrod) | ROS Humble 다단계 이미지 초안. 현재 전체 패키지와 React production bundle 생성 흐름을 포함하는지 보완이 필요하다. |
+| [entrypoint.camrod.sh](entrypoint.camrod.sh) | ROS/workspace 환경을 읽고 전달받은 명령을 실행한다. |
+| [buildx_camrod.sh](buildx_camrod.sh) | Buildx 빌드·게시 보조 스크립트. 기본값 `PUSH_IMAGE=1`이며, ARM64를 포함하면 기본적으로 privileged binfmt 설치를 수행한다. |
+| [Dockerfile.base](Dockerfile.base), [Dockerfile.module](Dockerfile.module) | 보존된 모듈별 이미지 실험. 현재 패키지 의존성과 실제 컨테이너 실행 재검증이 필요하다. |
+| [build_module.sh](build_module.sh), [run_module.sh](run_module.sh) | 스크립트가 있는 소스 경로와 명령 인자를 보존하도록 수정했다. 기본 이미지는 `camrod/base:humble`로 통일하며 `BASE_IMAGE`로 바꿀 수 있다. Docker stub을 이용한 경로·인자 검사만 실행했다. |
+| [compose.modules.yaml](compose.modules.yaml) | 보존된 모듈별 compose 구성. 현재 전체 로봇 실행 경로로 검증되지 않았다. |
 
-- full-stack image drafts
-- per-module image drafts
-- local run helper scripts
-- compose variants
+## 경로와 재검증 조건
 
-Those overlapped in responsibility and made maintenance confusing.
-
-This has been consolidated into one supported flow:
-
-- one main Dockerfile (`Dockerfile.camrod`)
-- one entrypoint (`entrypoint.camrod.sh`)
-- one build/push helper (`buildx_camrod.sh`)
-
-## Removed Legacy Files
-
-The following files were removed because they were no longer part of the active build/deploy path:
-
-- `Dockerfile.base`
-- `Dockerfile.module`
-- `build_module.sh`
-- `run_module.sh`
-- `compose.modules.yaml`
-
-## Files and Roles
-
-- `Dockerfile.camrod`
-  - Multi-stage Dockerfile for the full workspace runtime image.
-  - Builds on ROS 2 Humble (`ros:humble`) and supports amd64/arm64 via Buildx.
-  - Installs dependencies with `rosdep`, builds CAMROD packages, and sets default command:
-    - `ros2 launch camrod_bringup bringup.launch.py`
-  - `rosdep` is constrained to runtime/build dependency types only:
-    - `build, buildtool, exec` (test/doc dependencies excluded for faster CI/container builds)
-
-- `buildx_camrod.sh`
-  - Build/push helper script for Docker Buildx.
-  - Supports single-arch (`linux/arm64`) or multi-arch (`linux/amd64,linux/arm64`) publishing.
-  - Default image repo: `lehong/camrod`.
-
-- `entrypoint.camrod.sh`
-  - Container entrypoint.
-  - Sources ROS/workspace setup and executes the container command.
-
-## Build and Push
-
-### A) Push arm64 only (quick)
+`Dockerfile.camrod`의 `COPY`와 소스 검사 단계는 빌드 context 바로 아래에
+`camrod_bringup`, `camrod_common` 등의 소스가 있다고 가정한다. 이 workspace에서는
+context가 `/home/nvidia/camrod_ws/src`이고 Dockerfile은 그 아래
+`docker/Dockerfile.camrod`다. `buildx_camrod.sh`의 기본
+`WORKSPACE_ROOT=/home/camrod_ws`를 그대로 사용하면 현재 배치와 맞지 않는다.
 
 ```bash
-cd /home/camrod_ws/docker
-IMAGE_REPO=lehong/camrod \
-IMAGE_TAG=v1.1-arm64 \
-PLATFORMS=linux/arm64 \
-WORKSPACE_ROOT=/home/camrod_ws \
-./buildx_camrod.sh
+# 저장소 src 루트에서, Dockerfile의 현재 패키지/프런트엔드 구성을 먼저 보완한 뒤 사용한다.
+# 로컬 단일 아키텍처 빌드 예시이며 이번 검증에서 실행한 명령이 아니다.
+WORKSPACE_ROOT="$PWD" DOCKERFILE_REL=docker/Dockerfile.camrod \
+  IMAGE_TAG=v2.2.8-local PLATFORMS=linux/arm64 \
+  PUSH_IMAGE=0 INSTALL_BINFMT=0 ./docker/buildx_camrod.sh
 ```
 
-### B) Push multi-arch (amd64 + arm64)
-
-```bash
-cd /home/camrod_ws/docker
-IMAGE_REPO=lehong/camrod \
-IMAGE_TAG=v1.1 \
-PLATFORMS=linux/amd64,linux/arm64 \
-WORKSPACE_ROOT=/home/camrod_ws \
-./buildx_camrod.sh
-```
-
-## Run
-
-```bash
-docker run --rm -it \
-  --network host \
-  --ipc host \
-  --gpus all \
-  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-  -e ROS_DOMAIN_ID=0 \
-  lehong/camrod:v1.1
-```
-
-## Notes
-
-- Build context must be workspace root (`/home/camrod_ws`).
-- Dockerfile path is `src/docker/Dockerfile.camrod`.
-- If arm64 build fails with binfmt/qemu issues, retry with:
-
-```bash
-RESET_BUILDER=1 ./buildx_camrod.sh
-```
-
-## 2026-07-02 Runtime Update
-
-> HH_260702: Docker is not the canonical field validation path for v1.16.
-
-The current field/debug baseline was validated through the local workspace wrapper:
-
-```bash
-cd /home/nvidia/camrod_ws/src
-./colcon_build.sh --packages-select camrod_bringup camrod_map camrod_planning camrod_sensing camrod_system camrod_sensor_kit camrod_platform camrod_ui
-```
-
-Update this Docker guide only when the container build has been rerun with the same map, sensing, planning, diagnostics, and UI configs as the local workspace.
+호스트 아키텍처와 같은 `PLATFORMS`를 선택한다. Docker 이미지의 패키지 설치,
+UI bundle, 음성/카메라 드라이버, 장치 전달과 ROS 통신을 실제로 검증하기 전에는
+이 정의를 현장 배포 완료 자료로 사용하지 않는다. 2026-09-15 점검은 소스 및 셸
+구문 확인 범위이며 이미지 빌드·registry 게시·컨테이너 실차 실행을 포함하지 않는다.

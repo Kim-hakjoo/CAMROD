@@ -1,5 +1,10 @@
 from pathlib import Path
+import os
+import shutil
 import subprocess
+
+import pytest
+import yaml
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "field_test_tool.sh"
@@ -99,3 +104,53 @@ def test_config_sync_rejects_extra_package_and_install_files() -> None:
 
     assert "EXTRA package file:" in text
     assert "EXTRA installed file:" in text
+
+
+@pytest.mark.parametrize("mutation", [None, "approved-value", "extra-key", "installed-copy"])
+def test_config_accepts_only_exact_deployment_overrides(tmp_path, mutation):
+    root = SCRIPT.parents[2]
+    checkout = tmp_path / "checkout"
+    script = checkout / "camrod_bringup/scripts/field_test_tool.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy2(SCRIPT, script)
+    shutil.copy2(root / "colcon_build.sh", checkout / "colcon_build.sh")
+    output = tmp_path / "output"
+    for label in ("platform", "map", "planning", "perception", "sensing",
+                  "system", "sensor_kit", "control", "localization"):
+        package = f"camrod_{label}"
+        package_dir = checkout / package / "config"
+        deployed_dir = checkout / "camrod_bringup/config" / label
+        package_dir.mkdir(parents=True)
+        deployed_dir.mkdir(parents=True)
+        filenames = {"platform": ["ranger_driver.yaml"],
+                     "planning": ["nav2_base.yaml", "nav2_vehicle.yaml"]}.get(label, [])
+        if not filenames:
+            (package_dir / "fixture.yaml").write_text("value: 1\n")
+            (deployed_dir / "fixture.yaml").write_text("value: 1\n")
+        for filename in filenames:
+            shutil.copy2(root / package / "config" / filename, package_dir / filename)
+            shutil.copy2(root / "camrod_bringup/config" / label / filename,
+                         deployed_dir / filename)
+        shutil.copytree(package_dir, output / "install" / package / "share" / package / "config")
+    shutil.copytree(checkout / "camrod_bringup/config",
+                    output / "install/camrod_bringup/share/camrod_bringup/config")
+    if mutation:
+        changed = checkout / "camrod_bringup/config/planning/nav2_vehicle.yaml"
+        if mutation == "installed-copy":
+            changed = output / "install/camrod_bringup/share/camrod_bringup/config/planning/nav2_vehicle.yaml"
+        content = yaml.safe_load(changed.read_text())
+        values = content["controller_server"]["ros__parameters"]["RPP"]
+        values["lookahead_dist" if mutation == "approved-value" else "unapproved_key"] = 99.0
+        changed.write_text(yaml.safe_dump(content))
+    result = subprocess.run(
+        [str(script), "config"], cwd=tmp_path,
+        env=dict(os.environ, CAMROD_BUILD_ROOT=str(output)),
+        capture_output=True, text=True,
+    )
+    if mutation is None:
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert result.stdout.count("OK intentional deployment override:") == 3
+        assert "config sync OK" in result.stdout
+    else:
+        assert result.returncode != 0
+        assert "DIFF " in result.stdout

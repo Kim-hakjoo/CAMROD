@@ -19,7 +19,7 @@ import yaml
 
 SRC_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_MAP = SRC_ROOT / "lanelet2_maps.osm"
-MAP_SHA256 = "2c96514fa788e46ab5061a0ebc130a732557045d0baa3b67bb9f9dbcb132fef7"
+MAP_SHA256 = "57cd044cb714f3f4c899868b5287c6c435e14395422e4f75eb66fd8eaa091fbb"
 HISTORICAL_MAP_SHA256 = "8fa13157b8e956559ad29b1bf49b4357ec6d252b0259debfb40a946b29f24e59"
 RENDERER = (
     SRC_ROOT
@@ -98,7 +98,8 @@ def test_current_area_export_configs_are_synchronized() -> None:
 def test_historical_operating_point_report_retains_map_v22_identity() -> None:
     """Archived source evidence must not claim validation of the active map."""
     report = json.loads((ASSET_ROOT / "park-operating-points.json").read_text())
-    assert _sha256(ACTIVE_MAP) == MAP_SHA256
+    historical_map = SRC_ROOT / "lanelet2_maps_(copy_park_v1.0.11).osm"
+    assert _sha256(historical_map) == HISTORICAL_MAP_SHA256
     assert report["map"] == {
         "source_file": "lanelet2_maps.osm",
         "map_version": 22,
@@ -223,25 +224,20 @@ def test_active_semantic_geometry_uses_the_shared_local_cartesian_projector() ->
     assert len(exported) == len(lanelet_map.areaLayer) == 14
 
 
-def test_active_map_changes_only_approved_metadata_and_retired_zone_relation() -> None:
-    """Retire relation 2320, retaining all user-authored way/node geometry."""
+def test_active_map_preserves_the_current_field_snapshot_and_retired_zone() -> None:
+    """Bind active geometry to the adopted v27 source, including node edits."""
     import xml.etree.ElementTree as ET
 
     active = ET.parse(ACTIVE_MAP).getroot()
-    snapshot = ET.parse(SRC_ROOT / "lanelet2_maps_(copy_park_v1.0.13).osm").getroot()
-    retired = snapshot.find("relation[@id='2320']")
+    # fd53f7e6 adopted the operator's v1.0.18 snapshot: v27 intentionally
+    # changed lanelet geometry after the v1.0.13 metadata-only migration.
+    snapshot_path = SRC_ROOT / "lanelet2_maps_(copy_park_v1.0.18).osm"
+    assert _sha256(snapshot_path) == _sha256(ACTIVE_MAP) == MAP_SHA256
+    snapshot = ET.parse(snapshot_path).getroot()
+    earlier = ET.parse(SRC_ROOT / "lanelet2_maps_(copy_park_v1.0.13).osm").getroot()
+    retired = earlier.find("relation[@id='2320']")
     assert retired is not None
     assert active.find("relation[@id='2320']") is None
-    snapshot.remove(retired)
-    for relation in active.findall("relation"):
-        for tag in list(relation.findall("tag")):
-            if tag.attrib["k"] in ("parking_method", "service_mode"):
-                relation.remove(tag)
-            elif tag.attrib["k"] == "yaw_deg" and any(
-                t.attrib == {"k": "subtype", "v": f"camping_site_{index}"}
-                for t in relation.findall("tag") for index in range(1, 14)
-            ):
-                relation.remove(tag)
     # ElementTree retains tag-tail whitespace, so compare element structure
     # and attributes, not incidental serialization indentation.
     def structure(element):

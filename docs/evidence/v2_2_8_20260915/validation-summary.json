@@ -1,0 +1,1040 @@
+{
+  "source_commit": "b91981d552ab7ac47aa1177b341df6f8b379a223",
+  "release_tag": "v2.2.8",
+  "architecture": "aarch64",
+  "os": "Ubuntu 22.04.5 LTS",
+  "ros": "Humble",
+  "build": {
+    "kind": "Full workspace incremental build using existing build/install outputs",
+    "result": "PASS",
+    "package_count": 65,
+    "packages": [
+      "avg_msgs",
+      "camrod_bringup",
+      "camrod_control",
+      "camrod_localization",
+      "camrod_map",
+      "camrod_perception",
+      "camrod_planning",
+      "camrod_platform",
+      "camrod_runtime",
+      "camrod_sensing",
+      "camrod_sensor_kit",
+      "camrod_system",
+      "camrod_ui",
+      "camrod_ui_tester",
+      "camrod_voice",
+      "cv_bridge",
+      "ground_segmentation_ros2",
+      "image_geometry",
+      "lanelet2",
+      "lanelet2_core",
+      "lanelet2_examples",
+      "lanelet2_io",
+      "lanelet2_maps",
+      "lanelet2_matching",
+      "lanelet2_projection",
+      "lanelet2_python",
+      "lanelet2_routing",
+      "lanelet2_traffic_rules",
+      "lanelet2_validation",
+      "laser_geometry",
+      "nav2_behavior_tree",
+      "nav2_bt_navigator",
+      "nav2_common",
+      "nav2_controller",
+      "nav2_core",
+      "nav2_costmap_2d",
+      "nav2_lifecycle_manager",
+      "nav2_msgs",
+      "nav2_planner",
+      "nav2_regulated_pure_pursuit_controller",
+      "nav2_smac_planner",
+      "nav2_util",
+      "nav2_voxel_grid",
+      "ntrip_client",
+      "opencv4_vendor",
+      "opencv_tests",
+      "pcl_conversions",
+      "pcl_ros",
+      "perception_pcl",
+      "ranger_base",
+      "ranger_bringup",
+      "ranger_msgs",
+      "robot_localization",
+      "ublox",
+      "ublox_gps",
+      "ublox_msgs",
+      "ublox_serialization",
+      "ugv_sdk",
+      "vanjee_lidar_msg",
+      "vanjee_lidar_sdk",
+      "vision_msgs",
+      "vision_msgs_rviz_plugins",
+      "vision_opencv",
+      "yolov9mit",
+      "yolov9mit_ros"
+    ],
+    "log_sha256": "37dd86d6327b62ae95d3b58e1f6a6afefdc2d07ff98f8254e3b7d56c9672824f",
+    "log_relative_path": "build/full-build.log",
+    "warning": "camrod_bringup CMake CMP0009 symlink-install warning"
+  },
+  "local_audio_contract": {
+    "test_count": 880,
+    "passed": 866,
+    "failed": 14,
+    "failure_reason": "Pre-existing user WAV content differs from released SHA256 contract; original user files preserved"
+  },
+  "release_voice_contract": {
+    "scope": "Separate git archive v2.2.8 fixture",
+    "passed": 130
+  },
+  "scripts": {
+    "maintained_count": 12,
+    "syntax_errors": 0,
+    "byte_duplicate_groups": 0,
+    "related_checks_passed": 42,
+    "actual_config_audit": {
+      "exit_code": 0,
+      "verified_overrides": 3,
+      "config_sync": "OK"
+    }
+  },
+  "evidence_directory": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915",
+  "raw_evidence_sha256": {
+    "ui/jest.json": "7931da46db562eb117b992ec3b5834b090ba31ce3f632d3c499c59fd1506158e",
+    "ui/ui.junit.xml": "24019d879f1a03760201d0f271ca574d273969a0681ab3674e3a54e1d993e0d1",
+    "voice/release-voice.junit.xml": "9d2a4038173820975a333a4d14371f55680abefa0381fb3daba607e13c495c50",
+    "scripts/pytest-final.log": "bd55f9e1a706395006fb5b7c468726461862f7ea5b5ab4cb3d4df45f6d81590b",
+    "docs/docs-assets.junit.xml": "c719bce55e35d340e156ff2ff88e5a09cdf467b07bdcf1a9d1e83bb408d03c3c",
+    "docs/renderer-final.junit.xml": "adbdb54f469f3cdb4c5d127d12575829684f4d27e69726cbc07104828d219af5",
+    "tests/functional-final.json": "f838d2b40ef885627e80e4fbd1ae01966734346a2a86d8e4dac5c242bb67f1bc",
+    "build/runtime-link-check.json": "8c4a67bb8ed9d1a0889e36c5c2f3871dc6d687c443fb78736990cf7cdb4eaefd",
+    "ui/live-api/result.json": "8fb34b03b66af3d7694308e8e2016656a295da05122676c68b1d248fab975b8a",
+    "ui/live-api/state-checks.json": "ec290e6fec81fd64e6660bea8a5796252bbf62c43a5cd648a6f45437fd46e511",
+    "ui/ros-smoke/result.json": "088b53c70d22df0f5d563b0d292adefa6de0b408b7fecc961599f535164b19a9",
+    "voice/local-audio-preservation.json": "441d5ed926afdfe1c573c73dcd5e5efcbbcb3600167a5ae87c26b8fb82fa945c",
+    "docs/audit-final.json": "de798a07bfbc5ff36bf49178221e130647d1996721123dd62c0991e5881dea47",
+    "scripts/inventory-final.json": "a0c529c429131df0de783e1bc62f18f6df036673d83047fd31328e766cc118ca",
+    "scripts/shellcheck-final.json": "f8bcbc4ae04d634a19d665753062e8228f56106203dba714eaa6420515d16c72",
+    "scripts/AUDIT.md": "e690362a9c1cd79a1e20274ce7c5c8d42e567467d3eaad639ea3da0fa11f7b56",
+    "docs/links-final.json": "220bbea5ed7006ba99279bd988a6e35219ef9985f0d8e503a63032bc5bf6004b",
+    "ui/webkit-report.json": "9a6e488e15a058f926141bad8b693c920c9dafc15c444c5a3638cfbb6c12bace",
+    "ui/ui-layout-build.log": "7b6c57cecac38584465e8077d5dbb5af2ec42bb003e77e4bdd8d491be769bad5",
+    "ui/waiting-layout-probe.json": "573ba03f552c76e94572cea7c6c1b861b30c751833fd7f69151c67c7c4be27b9"
+  },
+  "react": {
+    "passed": 61
+  },
+  "docs_assets": {
+    "initial_after_stale_reference_fixes": {
+      "passed": 28,
+      "failed": 1,
+      "reason": "Pillow9.0 has no Image.Palette namespace"
+    },
+    "failed_test_after_compatibility_fix": {
+      "passed": 1,
+      "failed": 0
+    },
+    "original_results_overlap": true
+  },
+  "functional_tests": {
+    "ctest_packages": [
+      {
+        "package": "camrod_bringup",
+        "targets": 29,
+        "initial_failed": [
+          "test_module_readme_assets"
+        ]
+      },
+      {
+        "package": "camrod_control",
+        "targets": 9,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_localization",
+        "targets": 7,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_perception",
+        "targets": 1,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_planning",
+        "targets": 6,
+        "initial_failed": [
+          "test_planning_runtime_coalescing"
+        ]
+      },
+      {
+        "package": "camrod_platform",
+        "targets": 5,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_sensing",
+        "targets": 12,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_system",
+        "targets": 6,
+        "initial_failed": []
+      },
+      {
+        "package": "camrod_voice",
+        "targets": 2,
+        "initial_failed": []
+      }
+    ],
+    "functional_ctest_targets": 77,
+    "corrected_target_reruns": [
+      {
+        "name": "test_planning_runtime_coalescing",
+        "passed": true
+      },
+      {
+        "name": "test_module_readme_assets",
+        "passed": true
+      }
+    ],
+    "unregistered_python": [
+      {
+        "file": "camrod_bringup/test/test_entrypoint_checkout_paths.py",
+        "cases": 19,
+        "failures": 0
+      },
+      {
+        "file": "camrod_bringup/test/test_guest_recall_wait_contract.py",
+        "cases": 3,
+        "failures": 0
+      },
+      {
+        "file": "camrod_runtime/test/test_scoped_component_container_contract.py",
+        "cases": 4,
+        "failures": 0
+      },
+      {
+        "file": "camrod_system/test/test_parking_authority_config.py",
+        "cases": 4,
+        "failures": 0
+      },
+      {
+        "file": "camrod_voice/test/test_parking_voice_contract.py",
+        "cases": 24,
+        "failures": 0
+      },
+      {
+        "file": "util/camrod_ui_tester/test/test_scenario_engine.py",
+        "cases": 13,
+        "failures": 0
+      },
+      {
+        "file": "util/camrod_ui_tester/test/test_simulator_backend_stop.py",
+        "cases": 5,
+        "failures": 0
+      }
+    ],
+    "unregistered_python_cases": 72,
+    "test_env": {
+      "ROS_LOCALHOST_ONLY": "1",
+      "ROS_DOMAIN_ID": "191 (test-specific187/188/189/226 overrides)",
+      "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+    },
+    "result": "PASS after two corrected target reruns",
+    "excluded": [
+      "cppcheck",
+      "cpplint",
+      "flake8",
+      "pep257",
+      "uncrustify",
+      "lint_cmake",
+      "xmllint"
+    ]
+  },
+  "installed_dynamic_dependencies": {
+    "checked": 88,
+    "failures": []
+  },
+  "live_api": {
+    "result": "PASS",
+    "checks": [
+      "Robot/Guest HTTP, installed bundle, metrics API, passive recorder API",
+      "ready: synthetic scenario accepted, UI state readable",
+      "low_battery: synthetic scenario accepted, UI state readable",
+      "estop: synthetic scenario accepted, UI state readable",
+      "localization_lost: synthetic scenario accepted, UI state readable",
+      "clear_faults: synthetic scenario accepted, UI state readable"
+    ],
+    "ros_domain_id": 192,
+    "provenance": "Installed real UI/Guest/recorder with local simulator; synthetic state only, no hardware driver.",
+    "state_directory": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/live-api/state",
+    "production_database_sha256_before": "074e94e92a0ae92bde24f3c02e53f695e0a849e451b4d68d450e408f917e874d",
+    "production_database_sha256_after": "074e94e92a0ae92bde24f3c02e53f695e0a849e451b4d68d450e408f917e874d",
+    "production_database_preserved": true
+  },
+  "live_api_state_checks": {
+    "result": "PASS",
+    "checks": {
+      "ready": true,
+      "low_battery_feedback": true,
+      "low_battery_below_admission_threshold": true,
+      "estop_blocks_readiness": true,
+      "localization_loss_reported": true,
+      "fault_clear_restores_readiness": true,
+      "all_scenarios_remain_disengaged": true
+    },
+    "source": "Actual installed backend API snapshots from isolated simulator domain 192."
+  },
+  "recorder_smoke": {
+    "provenance": "Actual ROS node and typed DDS messages; synthetic test inputs, NOT robot/CARLA driving.",
+    "ros_domain_id": 188,
+    "control_commands_published": false,
+    "checks": [
+      {
+        "id": "isolated-ros-smoke:mission:1",
+        "name": "2026-09-15 #001 B7 delivery",
+        "site": "B7",
+        "intent": "delivery",
+        "result": "completed",
+        "total_m": 2.175175237655639,
+        "autonomous_m": 1.7203372716903684,
+        "manual_m": 0.4198866844177247,
+        "unknown_m": 0.034951281547546384,
+        "stop_count": 2,
+        "stop_duration_s": 3.4000325202941895,
+        "manual_interventions": 1
+      },
+      {
+        "id": "isolated-ros-smoke:mission:2",
+        "name": "2026-09-15 #002 B7 recall",
+        "site": "B7",
+        "intent": "recall",
+        "result": "completed",
+        "total_m": 2.174777054786682,
+        "autonomous_m": 1.7198189496994023,
+        "manual_m": 0.4200869560241699,
+        "unknown_m": 0.034871149063110354,
+        "stop_count": 2,
+        "stop_duration_s": 3.3003287315368652,
+        "manual_interventions": 1
+      },
+      {
+        "id": "isolated-ros-smoke:mission:3",
+        "name": "2026-09-15 #003 B8 delivery",
+        "site": "B8",
+        "intent": "delivery",
+        "result": "completed",
+        "total_m": 2.1757515192031858,
+        "autonomous_m": 1.7207392692565915,
+        "manual_m": 0.41997499465942384,
+        "unknown_m": 0.03503725528717041,
+        "stop_count": 2,
+        "stop_duration_s": 3.349703788757324,
+        "manual_interventions": 1
+      },
+      {
+        "id": "isolated-ros-smoke:mission:4",
+        "name": "2026-09-15 #004 B8 recall",
+        "site": "B8",
+        "intent": "recall",
+        "result": "completed",
+        "total_m": 2.1750391006469725,
+        "autonomous_m": 1.7199379682540896,
+        "manual_m": 0.4200586318969727,
+        "unknown_m": 0.03504250049591064,
+        "stop_count": 2,
+        "stop_duration_s": 3.300133466720581,
+        "manual_interventions": 1
+      },
+      {
+        "id": "isolated-ros-smoke:mission:5",
+        "name": "2026-09-15 #005 B9 delivery",
+        "site": "B9",
+        "intent": "delivery",
+        "result": "completed",
+        "total_m": 2.2215404510498047,
+        "autonomous_m": 1.7664486408233646,
+        "manual_m": 0.4200899124145508,
+        "unknown_m": 0.03500189781188965,
+        "stop_count": 2,
+        "stop_duration_s": 3.3000125885009766,
+        "manual_interventions": 1
+      },
+      {
+        "id": "isolated-ros-smoke:mission:6",
+        "name": "2026-09-15 #006 B9 recall",
+        "site": "B9",
+        "intent": "recall",
+        "result": "completed",
+        "total_m": 2.1931432247161866,
+        "autonomous_m": 1.7187855005264279,
+        "manual_m": 0.43879661560058586,
+        "unknown_m": 0.035561108589172365,
+        "stop_count": 2,
+        "stop_duration_s": 3.2998580932617188,
+        "manual_interventions": 1
+      }
+    ],
+    "result": "PASS",
+    "mission_count": 6,
+    "completed_count": 6,
+    "recorder_publisher_topics": [
+      "/parameter_events",
+      "/rosout",
+      "/ui/mission_recording/status"
+    ],
+    "lifetime": {
+      "autonomous_m": 10.366067600250243,
+      "manual_m": 2.8086899757385257,
+      "unknown_m": 0.22048826217651368,
+      "total_m": 13.395245838165282,
+      "mission_count": 6,
+      "completed_count": 6,
+      "manual_interventions": 6
+    },
+    "outside_missions": {
+      "autonomous_m": 0.0,
+      "manual_m": 0.26979618072509765,
+      "unknown_m": 0.010023069381713868,
+      "total_m": 0.2798192501068115,
+      "session_count": 1
+    },
+    "actual_raw_can_tested": false,
+    "snapshot_path": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/ros-smoke/records/snapshot.json"
+  },
+  "local_audio_preservation": [
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B1.wav",
+      "sha256": "dd86ca995c31659521efe035ca2c35c7421f9440e37bb84fd01763eb45774437",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.4
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B10.wav",
+      "sha256": "9498cbd0c116958f553d499d044dbd5e36684f3b6749d0451d82985b5cafc5c3",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.4480416666666667
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B11.wav",
+      "sha256": "6aa007b70a333fcd5c5eb23c9b2fb4f65664885b92fbdac1d18fd30a68d031e5",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.592
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B12.wav",
+      "sha256": "c31994367c6fd694dd4804f7ffc4433648f8687c90e922a95c1beabca57927c6",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.52
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B13.wav",
+      "sha256": "85e96c9c96b773ab3e146aa6fb8e77de1a3fc37ae0c930c109d7cf52e1b008f0",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.616
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B2.wav",
+      "sha256": "6d33372f3dfc9919d8a9f074505afded157f59e106f0393b4812c89b69a00aaa",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.328
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B3.wav",
+      "sha256": "6bc9d9901b1c9ac7b7a54e0f3d826122966bc49f25018d55b3d43e9606efeebb",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.424
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B4.wav",
+      "sha256": "45d63bfc7435ee01ff1467fd4a153945a3530a5f1f6db255d720f81bcf93f254",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.4
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B5.wav",
+      "sha256": "9952084e899deec3639c6423950a46d0bb99c468546c7b5b1a9e7961c46b1682",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.376
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B6.wav",
+      "sha256": "6fe3abdbc0120d46ea66f5920707ed4f8e9cfb740ba3aa8200bdb2790da3e40f",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.424
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B7.wav",
+      "sha256": "70806f40095afa052c49dea40b5b31beb6f43399c0e29922b195daf656f31b01",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.472
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B8.wav",
+      "sha256": "b71f70a13164f121da2ac2ada947eb9695e1281298a19115b1c6d1add9a0e248",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.4480416666666667
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/site_B9.wav",
+      "sha256": "afa66d315fc51517e81344678b6f9e0903fd8b689e673a6e86dee846b04e7128",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 2.376
+    },
+    {
+      "file": "camrod_voice/resource/audio/ko-KR/navigation/to_campsite.wav",
+      "sha256": "f8fdb58e6a4abfcb3316e0c4ff4d4b7d7e62df395cacb00bd86128ce99e42c14",
+      "preserved": true,
+      "channels": 1,
+      "sample_rate": 24000,
+      "sample_width": 2,
+      "duration_s": 3.936
+    }
+  ],
+  "maintained_source_changes_sha256": {
+    "camrod_bringup/scripts/field_test_tool.sh": "711593a862d5f763811b0614663e2dbbf6727ccf6e37bbd186f322e69a3b1d82",
+    "camrod_bringup/scripts/run_bringup.sh": "0fa67daf4d57acb5ab4240aa48d39078c95b579a9c5b027a18cc98653988641b",
+    "camrod_bringup/scripts/visualization/render_module_readme_assets.py": "868599a0be666148e3e6e569985e40a63fa15c658ccfbbc77433b43979adef9a",
+    "camrod_bringup/scripts/visualization/render_v2_1_8_return_docking_results.py": "76689ff1baa91df686d1428a0fd566d6b5b8b0b0249b2307b5e5d87719fc985f",
+    "camrod_bringup/test/test_entrypoint_checkout_paths.py": "85d308614597ae5902a86f26d23ad13d7fde1c1029dda1b0b03c93c3e84086ec",
+    "camrod_bringup/test/test_field_test_tool_contract.py": "1ab11d9fafd979b21d0dbfcee0c854cb69adda50efe9e28ca285484a9880ce94",
+    "camrod_bringup/test/test_module_readme_assets.py": "bc9ad81e161f4339a40d343dd09b8a173bc80a7f902de5bf63290940035355da",
+    "camrod_bringup/test/test_park_operating_points_assets.py": "480026265b27ec0ce7b9c775d4acc418358c1c9b2f77938816ed209546e644dd",
+    "camrod_bringup/test/test_v2_1_8_return_docking_assets.py": "4aefcdd70653d3745744b4dd292776a6e25856cacee01c51fb2e2713ca2fdf96",
+    "camrod_bringup/test/test_workspace_shell_tools.py": "19a9fd149a5f9094fdcb264c173670a036d8bfbe3205b1881a46e08c2d46efc9",
+    "camrod_control/test/test_camping_site_recall_return.cpp": "76341410fa2f727c1c4d620215c98caabd455eaa0725697c701f1bc3883f43aa",
+    "camrod_planning/test/test_planning_runtime_coalescing.py": "729e41d212a2f33d0aa7a41cffd4e114b441691ccba4df1240023d094925dc14",
+    "camrod_system/CMakeLists.txt": "1449aa11d7182fd76bb4db423d3a0debaf805f65fcc71e69a9c006992a011b1e",
+    "camrod_ui/camrod_ui_robot/assets/frontend/src/App.css": "5e8e4164cd695f05f2f88c3ffe76dcdf0bc8cb75f8870d02e957e0e8c711c3aa",
+    "camrod_ui/camrod_ui_robot/assets/frontend/src/ServiceEvidence.css": "6308bd1d205715d9dbc6f2d8137c6ce68ee430ec6bfc2233c264a1876377e14c",
+    "docker/build_module.sh": "cd9f8efa2dff4dba628fe0f68a6ff55b3f2829845015abd054db9630305628fb",
+    "docker/run_module.sh": "281361c9c4873fec2fd2e38ce7279da04de61f9bd98fedd74844ddcbb9a15690",
+    "docs/assets/module-guides/bringup/test-results/b8-return-docking-20260819/SHA256SUMS": "a84af7f9da1724c2bd95d469beff4c0ff6bd206178d7da5360434ddc7ea57385"
+  },
+  "included_screenshots": [
+    {
+      "file": "operator-waiting-1600x1000.png",
+      "sha256": "3b48d7fc243a679e2c794c99fcdcc12efe6589da0106903a932580b55c01bb9d",
+      "dimensions": [
+        1600,
+        1000
+      ],
+      "source": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/operator-waiting-1600x1000.png"
+    },
+    {
+      "file": "service-evidence-1600x1000.png",
+      "sha256": "07578e687f371e9020644270254e015276e8f7d13665ce429baeb769fdc34772",
+      "dimensions": [
+        1600,
+        1000
+      ],
+      "source": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/service-evidence-1600x1000.png"
+    },
+    {
+      "file": "mission-records-1600x1000.png",
+      "sha256": "398885f3440bb95fee6446e74f7ff021938165ae05f23235af37826159922a28",
+      "dimensions": [
+        1600,
+        1000
+      ],
+      "source": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/mission-records-1600x1000.png"
+    },
+    {
+      "file": "mission-detail-390x844.png",
+      "sha256": "176f8547f791b0b751d36a16e8ebe299c7a6448a262a73e59c65274c66fe9a4f",
+      "dimensions": [
+        390,
+        844
+      ],
+      "source": "/home/nvidia/camrod_ws/validation/v2.2.8-20260915/ui/mission-detail-390x844.png"
+    }
+  ],
+  "webkit": {
+    "result": "PASS",
+    "provenance": "Actual production React bundle rendered in native WebKitGTK on Jetson ARM64. UI state and legacy totals are fixtures; mission records are actual recorder output from isolated synthetic DDS smoke, not robot driving.",
+    "engine": "WebKitGTK 2.50.4",
+    "bundle_index_sha256": "f218ad68b93b9b5da864bdcb100f817a4939d562002972bdb20f2a78dd5b3902",
+    "failures": [],
+    "http_errors": [],
+    "verification_note": "1920x1080 initial fixed-delay capture preceded React effect completion under concurrent load; rerun after bounded expected-text wait passed.",
+    "scenarios": [
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 0,
+        "name": "operator-waiting-1600x1000",
+        "required_text": {
+          "운행 준비 완료": true,
+          "실증 운행": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 13,
+        "name": "service-evidence-1600x1000",
+        "required_text": {
+          "실증 운행 누적 현황": true,
+          "왕복 미션": true,
+          "구간 미확인": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 6,
+        "siteRows": 13,
+        "name": "mission-records-1600x1000",
+        "required_text": {
+          "기록기: CLOSED": true,
+          "새 기록기 누적": true,
+          "B7": true,
+          "B8": true,
+          "B9": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 6,
+        "siteRows": 13,
+        "name": "mission-detail-1600x1000",
+        "required_text": {
+          "실제로 기록된 진행 단계": true,
+          "정지 기록": true,
+          "수동 개입": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 2,
+        "siteRows": 13,
+        "name": "mission-filter-b7-1600x1000",
+        "required_text": {
+          "B7": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1600,
+        "height": 1000,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 2,
+        "siteRows": 13,
+        "name": "mission-recorder-unavailable-1600x1000",
+        "required_text": {
+          "HTTP 503": true,
+          "최신 기록으로 확정하지 않습니다": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 0,
+        "name": "operator-waiting-1920x1080",
+        "required_text": {
+          "운행 준비 완료": true,
+          "실증 운행": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 13,
+        "name": "service-evidence-1920x1080",
+        "required_text": {
+          "실증 운행 누적 현황": true,
+          "왕복 미션": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 0,
+        "name": "operator-waiting-390x844",
+        "required_text": {
+          "실증 운행": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 0,
+        "siteRows": 13,
+        "name": "service-evidence-390x844",
+        "required_text": {
+          "실증 운행 누적 현황": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 6,
+        "siteRows": 13,
+        "name": "mission-records-390x844",
+        "required_text": {
+          "새 기록기 누적": true
+        },
+        "passed": true,
+        "failures": []
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "documentOverflowX": 0,
+        "errors": [],
+        "commands": [],
+        "metricTextOverflow": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "missionRows": 6,
+        "siteRows": 13,
+        "name": "mission-detail-390x844",
+        "required_text": {
+          "실제로 기록된 진행 단계": true
+        },
+        "passed": true,
+        "failures": []
+      }
+    ]
+  },
+  "frontend_css_bundle": "main.39a20c5d.css",
+  "ui_latest_rebuild_contract_checks_passed": 41
+}

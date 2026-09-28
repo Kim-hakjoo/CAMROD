@@ -200,3 +200,12 @@ ros2 run tf2_ros tf2_echo world map
 Grid dimensions and thresholds are source configuration, not measured map-build
 latency. Field route coverage remains pending where service-access geometry is
 missing.
+
+### RViz black viewport on Jetson
+
+If RViz logs `Failed to create an OpenGL context. GLXBadDrawable`, compare the
+same configuration without `-stylesheet`. On the 2026-09-15 Jetson run, the
+theme's global `QWidget` background caused the black viewport. The theme now
+scopes that background to `QMainWindow, QDockWidget`, preserving native OpenGL
+render widgets. Restart RViz after a stylesheet change; no package rebuild is
+needed with the workspace's symlink install.

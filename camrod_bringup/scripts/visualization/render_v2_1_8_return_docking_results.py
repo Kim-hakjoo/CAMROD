@@ -546,14 +546,8 @@ def main() -> None:
     render_campsite_gif(data, control_dir / "b8-entry-return-sequence.gif")
     render_parking_profile(data, control_dir / "parking-slowdown-profile.png")
     shutil.copy2(report_path, bringup_dir / "b8-entry-return-report.json")
-    shutil.copy2(
-        control_dir / "b8-same-anchor-return.png",
-        bringup_dir / "b8-entry-return-summary.png",
-    )
-    shutil.copy2(
-        control_dir / "b8-entry-return-sequence.gif",
-        bringup_dir / "b8-entry-return-sequence.gif",
-    )
+    # The integration README links the controller's canonical PNG/GIF.
+    # Keep one copy of the same run rather than duplicating the images.
 
     campsite_metrics = data["campsite_check"]["metrics"]
     # HH_260818 - Preserve the administrator Return ordering assertions in the

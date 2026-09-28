@@ -35,10 +35,15 @@ exact drop-zone parking-point correction, and B1-B13 service metrics. -->
 shared station geometry and UI departure recovery; field acceptance is separate. -->
 
 ROS 2 Humble autonomous delivery robot stack for a Dual-Ackermann, crab, and
-zero-turn Ranger platform. Current release baseline: **`v2.2.6`**.
+zero-turn Ranger platform. Current release baseline: **`v2.2.8`**.
+
+[2026-09-15 Jetson build, UI and scenario verification](docs/evidence/v2_2_8_20260915/README.md)
+records the local develop/tag identity, actual screenshots, executed tests and
+preserved operator audio overrides. The [v2.2.8 implementation record](camrod_ui/docs/release_v2_2_8_validation.md)
+describes the mission recorder and its original release checks.
 
 <!-- HH_260911 - Current bounded validation supersedes no historical evidence. -->
-[v2.2.6 changes](docs/V2_2_6_RELEASE_NOTES.md) and
+Historical [v2.2.6 changes](docs/V2_2_6_RELEASE_NOTES.md) and
 [executed validation](docs/V2_2_6_VALIDATION.md) describe station recovery,
 voice cancellation, local build scope, and remaining field/endurance work.
 

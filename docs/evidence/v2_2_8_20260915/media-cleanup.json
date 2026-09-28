@@ -1,0 +1,35 @@
+{
+  "date": "2026-09-15",
+  "method": "SHA-256 exact file bytes; all references changed before removing redundant copies",
+  "removed_images": [
+    {
+      "removed": "docs/assets/module-guides/bringup/test-results/b8-return-docking-20260819/b8-entry-return-sequence.gif",
+      "canonical": "docs/assets/module-guides/control/test-results/campsite-return-docking-20260819/b8-entry-return-sequence.gif",
+      "sha256": "875fefb1c1aff66dbfca65efebe4b12ceba7ceb1ba3eff3108f7f73e1b11e327",
+      "bytes_saved": 104560
+    },
+    {
+      "removed": "docs/assets/module-guides/bringup/test-results/b8-return-docking-20260819/b8-entry-return-summary.png",
+      "canonical": "docs/assets/module-guides/control/test-results/campsite-return-docking-20260819/b8-same-anchor-return.png",
+      "sha256": "06f09b916ddbde77508f155f62bf00d0847db4e9152e927df7698022e715d128",
+      "bytes_saved": 60855
+    },
+    {
+      "removed": "docs/assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-policy.png",
+      "canonical": "docs/assets/module-guides/control/test-results/automatic-recovery-v2.1.3/automatic-owner-policy.png",
+      "sha256": "212eaa1fb675852f3ed068144d662d793c3233387229b8abbebdf17c4beff188",
+      "bytes_saved": 118311
+    }
+  ],
+  "bytes_saved": 283726,
+  "retained_duplicate_assets": [
+    {
+      "paths": [
+        "camrod_ui/camrod_ui_guest/assets/guest_frontend/월악산_국립공원_로고.jpg",
+        "camrod_ui/camrod_ui_robot/assets/frontend/public/월악산_국립공원_로고.jpg"
+      ],
+      "reason": "Required in two independently served/deployed public roots; source symlink behavior has not been verified through CRA and colcon deployment.",
+      "sha256": "54dd64e923b908e8cff0cc559b91d52eb9c9b874139e4ce757ae71d378ca0f7d"
+    }
+  ]
+}

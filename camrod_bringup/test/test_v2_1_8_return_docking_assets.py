@@ -98,7 +98,6 @@ def test_release_images_and_animations_are_renderable() -> None:
         PLATFORM / "normal-vs-crab-mode-selection.png": (1600, 900),
         CONTROL / "b8-same-anchor-return.png": (1600, 1040),
         CONTROL / "parking-slowdown-profile.png": (1600, 900),
-        BRINGUP / "b8-entry-return-summary.png": (1600, 1040),
         UI / "operator-docking-workspace.png": (1600, 1000),
         UI_PREEMPT / "manual-return-preemption.png": (1600, 920),
     }
@@ -110,7 +109,6 @@ def test_release_images_and_animations_are_renderable() -> None:
     animations = {
         PLATFORM / "normal-vs-crab-mode-selection.gif": 17,
         CONTROL / "b8-entry-return-sequence.gif": 7,
-        BRINGUP / "b8-entry-return-sequence.gif": 7,
     }
     for path, minimum_frames in animations.items():
         with Image.open(path) as image:

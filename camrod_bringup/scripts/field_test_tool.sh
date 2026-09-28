@@ -60,17 +60,30 @@ Usage:
 
 Environment:
   CAMROD_FIELD_LOG_ROOT  Override log root (default: $HOME/camrod_field_logs).
+  CAMROD_BUILD_ROOT      Select the same output root used by colcon_build.sh.
+
+  field_test_tool.sh --print-paths
+      Print this checkout's source/build/install/log paths without ROS actions.
 
 Notes:
   This script does not replace the physical e-stop or operator supervision.
 EOF
 }
 
-resolve_ws_root() {
+if [[ "${1:-help}" == help || "${1:-}" == -h || "${1:-}" == --help ]]; then
+  usage
+  exit 0
+fi
+
+resolve_source_root() {
   local probe="$1"
   while [[ "${probe}" != "/" ]]; do
-    if [[ -d "${probe}/src/camrod_bringup" ]]; then
+    if [[ -d "${probe}/camrod_bringup" && -f "${probe}/colcon_build.sh" ]]; then
       echo "${probe}"
+      return 0
+    fi
+    if [[ -d "${probe}/src/camrod_bringup" && -f "${probe}/src/colcon_build.sh" ]]; then
+      echo "${probe}/src"
       return 0
     fi
     probe="$(dirname "${probe}")"
@@ -79,9 +92,18 @@ resolve_ws_root() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-WS_ROOT="$(resolve_ws_root "${SCRIPT_DIR}" || resolve_ws_root "$(pwd)" || true)"
-[[ -n "${WS_ROOT}" ]] || die "cannot find workspace root (expected <ws>/src/camrod_bringup)"
-SRC_ROOT="${WS_ROOT}/src"
+SRC_ROOT="$(resolve_source_root "${SCRIPT_DIR}" || true)"
+[[ -n "${SRC_ROOT}" ]] || die "cannot find this script's CAMROD source checkout"
+RESOLVED_PATHS="$("${SRC_ROOT}/colcon_build.sh" --print-paths)"
+if [[ "${1:-}" == --print-paths ]]; then
+  printf '%s\n' "${RESOLVED_PATHS}"
+  exit 0
+fi
+WS_ROOT=""
+while IFS='=' read -r key value; do
+  if [[ "${key}" == WS_ROOT ]]; then WS_ROOT="${value}"; fi
+done <<< "${RESOLVED_PATHS}"
+[[ "${WS_ROOT}" == /* ]] || die "invalid CAMROD output root"
 
 source_ros() {
   # shellcheck disable=SC1091
@@ -147,6 +169,54 @@ topic_hz_to_log() {
   run_eval_to_log "${out_file}" "source /opt/ros/humble/setup.bash; source '${WS_ROOT}/install/setup.bash' 2>/dev/null || true; timeout --signal=INT --kill-after=2 '${seconds}' ros2 topic hz '${topic}'"
 }
 
+verified_deployment_override() {
+  local relative="$1" deployed="$2" package="$3"
+  case "${relative}" in
+    planning/nav2_base.yaml|planning/nav2_vehicle.yaml|platform/ranger_driver.yaml) ;;
+    *) return 1 ;;
+  esac
+  # Accept only the exact field A/B values; every other YAML key must match.
+  python3 - "${relative}" "${deployed}" "${package}" <<'PY'
+import sys
+import yaml
+
+relative, deployed_path, package_path = sys.argv[1:]
+try:
+    with open(deployed_path, encoding="utf-8") as stream:
+        deployed = yaml.safe_load(stream)
+    with open(package_path, encoding="utf-8") as stream:
+        package = yaml.safe_load(stream)
+    if relative.startswith("planning/"):
+        plugin = "RotationShim" if relative.endswith("nav2_base.yaml") else "RPP"
+        path = ("controller_server", "ros__parameters", plugin)
+        expected = {
+            "lookahead_dist": (1.2, 2.0),
+            "min_lookahead_dist": (1.1, 1.0),
+            "max_lookahead_dist": (2.0, 2.5),
+            "use_velocity_scaled_lookahead_dist": (False, True),
+        }
+    else:
+        path = ("/**", "ros__parameters")
+        expected = {
+            "steering_transition_rate_radps": (1.0, 1.5),
+            "steering_transition_min_velocity_scale": (0.0, 0.2),
+        }
+    package_values, deployed_values = package, deployed
+    for key in path:
+        package_values, deployed_values = package_values[key], deployed_values[key]
+    for key, (package_value, deployed_value) in expected.items():
+        if (type(package_values[key]) is not type(package_value) or
+                type(deployed_values[key]) is not type(deployed_value) or
+                package_values[key] != package_value or
+                deployed_values[key] != deployed_value):
+            sys.exit(1)
+        deployed_values[key] = package_values[key]
+    sys.exit(0 if deployed == package else 1)
+except (OSError, KeyError, TypeError, yaml.YAMLError):
+    sys.exit(1)
+PY
+}
+
 compare_tree_subset() {
   local label="$1"
   local bringup_dir="$2"
@@ -165,7 +235,7 @@ compare_tree_subset() {
   fi
 
   while IFS= read -r -d '' src; do
-    rel="${src#${bringup_dir}/}"
+    rel="${src#"${bringup_dir}/"}"
     dst="${package_dir}/${rel}"
     if [[ ! -f "${dst}" ]]; then
       echo "MISSING package file: ${label}/${rel}"
@@ -174,6 +244,8 @@ compare_tree_subset() {
     fi
     if cmp -s "${src}" "${dst}"; then
       echo "OK ${label}/${rel}"
+    elif verified_deployment_override "${label}/${rel}" "${src}" "${dst}"; then
+      echo "OK intentional deployment override: ${label}/${rel}"
     else
       echo "DIFF ${label}/${rel}"
       status=1
@@ -183,7 +255,7 @@ compare_tree_subset() {
   # HH_260730 - Also reject package-only files. A one-way subset check could
   # leave a package default unreviewed and absent from the deployed bringup.
   while IFS= read -r -d '' src; do
-    rel="${src#${package_dir}/}"
+    rel="${src#"${package_dir}/"}"
     dst="${bringup_dir}/${rel}"
     if [[ ! -f "${dst}" ]]; then
       echo "EXTRA package file: ${label}/${rel}"
@@ -207,7 +279,7 @@ compare_install_subset() {
     return 1
   fi
   while IFS= read -r -d '' src; do
-    rel="${src#${source_dir}/}"
+    rel="${src#"${source_dir}/"}"
     dst="${install_dir}/${rel}"
     if [[ ! -f "${dst}" ]]; then
       echo "MISSING installed file: ${label}/${rel}"
@@ -225,7 +297,7 @@ compare_install_subset() {
   # HH_260730 - Stale installed YAML is just as dangerous as a missing copy:
   # launch may still discover it by path even after the source was removed.
   while IFS= read -r -d '' src; do
-    rel="${src#${install_dir}/}"
+    rel="${src#"${install_dir}/"}"
     dst="${source_dir}/${rel}"
     if [[ ! -f "${dst}" ]]; then
       echo "EXTRA installed file: ${label}/${rel}"

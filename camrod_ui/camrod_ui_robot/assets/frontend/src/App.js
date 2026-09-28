@@ -37,6 +37,24 @@ const OPERATING_HOURS_GATE_ENABLED =
 const OPERATING_HOURS_START = parseHourEnv(process.env.REACT_APP_OPERATING_HOURS_START, 3);
 const OPERATING_HOURS_END = parseHourEnv(process.env.REACT_APP_OPERATING_HOURS_END, 23);
 
+// HH_260916 - The kiosk returns to standby after this long *without operator
+// input*, not after this long on screen. Every event below restarts it.
+const IDLE_STANDBY_RETURN_MS = 10000;
+// Pointer motion and wheel/touch scrolling are activity too: a visitor reading
+// a campsite photo or scrolling a list is using the screen without tapping it.
+const IDLE_ACTIVITY_EVENTS = Object.freeze([
+  'pointerdown',
+  'pointerup',
+  'pointermove',
+  'touchstart',
+  'touchmove',
+  'wheel',
+  'keydown',
+]);
+// A moving pointer fires continuously. Restarting a 10-second timeout dozens of
+// times per second is wasted work, and half a second of slack cannot expire it.
+const IDLE_ACTIVITY_THROTTLE_MS = 500;
+
 // HH_260721 - Mirror the platform-neutral service lifecycle used by backend and control.
 const SERVICE_STATE = Object.freeze({
   DROP_ZONE_WAIT: 0,
@@ -100,6 +118,14 @@ const RETURNING_STATES = new Set([
   SERVICE_STATE.RETURN_WITH_CARGO,
   SERVICE_STATE.DROP_ZONE_PARKING,
   SERVICE_STATE.WAITING_FOR_CHARGING,
+]);
+// HH_260916 - A stationary drop-zone state reached *from* one of these ends a
+// delivery or recall: the robot has finished parking or docking. The station
+// repeats the same stationary state as an idle heartbeat, so only the
+// transition identifies completion.
+const RETURN_COMPLETION_SOURCE_STATES = new Set([
+  ...RETURNING_STATES,
+  SERVICE_STATE.CHARGING,
 ]);
 const MOVING_SERVICE_STATES = new Set([
   SERVICE_STATE.MOVING_TO_SITE,
@@ -1298,9 +1324,13 @@ function App() {
   const wsMountedRef = useRef(false);
   const wsGenerationRef = useRef(0);
   const wsReconnectTimerRef = useRef(null);
-  const idleTimerRef = useRef(null);                    // 전체 OFF 시 10초 타이머
+  const idleTimerRef = useRef(null);                    // 마지막 조작 후 유휴 타이머
+  const lastIdleActivityRef = useRef(0);               // 활동 감지 throttle 기준 시각
   const chargingStandbyOpenedRef = useRef(false);
   const chargeCompleteStandbyOpenedRef = useRef(false);
+  // HH_260916 - 주차/도킹 완료를 관측한 뒤, 백엔드가 임무 소유권을 비우는
+  // 다음 프레임까지 들고 있는 래치. 아래 effect가 대기 화면 전환을 마무리한다.
+  const [returnCompletionPending, setReturnCompletionPending] = useState(false);
 
   const [outsideHoursMsg, setOutsideHoursMsg] = useState(false); // 운영시간 외 안내 메시지
   const [selectedSite, setSelectedSite] = useState(null);         // 이미지 프리뷰 대상 사이트
@@ -1534,7 +1564,7 @@ function App() {
     }
   };
 
-  // ── 모든 토글이 OFF이면 10초 후 대기 화면으로 복귀 ──────────────────────
+  // ── 마지막 조작 후 일정 시간이 지나면 대기 화면으로 복귀 ────────────────
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current);
@@ -1549,9 +1579,34 @@ function App() {
     ) {
       idleTimerRef.current = setTimeout(() => {
         setShowWaiting(true);
-      }, 10000);
+      }, IDLE_STANDBY_RETURN_MS);
     }
   }, [anyOn, manualDriveActive, showWaiting, isReturning, serviceStateName]);
+
+  // HH_260916 - Operator activity anywhere on the page keeps the current screen
+  // open. The layout roots below carry the same handler, but a bubbling handler
+  // cannot see input inside the site preview, the confirmation popups or the
+  // virtual keyboard: those stop propagation, so the kiosk used to jump back to
+  // standby while a visitor was still reading or typing. Listen on the document
+  // in the capture phase, which runs before any stopPropagation can apply.
+  useEffect(() => {
+    const onIdleActivity = () => {
+      const now = Date.now();
+      if (now - lastIdleActivityRef.current < IDLE_ACTIVITY_THROTTLE_MS) return;
+      lastIdleActivityRef.current = now;
+      resetIdleTimer();
+    };
+    const options = { capture: true, passive: true };
+    IDLE_ACTIVITY_EVENTS.forEach(type => {
+      document.addEventListener(type, onIdleActivity, options);
+    });
+    return () => {
+      IDLE_ACTIVITY_EVENTS.forEach(type => {
+        document.removeEventListener(type, onIdleActivity, { capture: true });
+      });
+    };
+  }, [resetIdleTimer]);
+
     useEffect(() => {
     if (anyOn || manualDriveActive) {
       // ON이 하나라도 있으면 타이머 해제 & 대기 화면 진입 방지
@@ -1564,10 +1619,10 @@ function App() {
       && !showWaiting
       && !isReturning
     ) {
-      // 전부 OFF + 복귀 중 아닐 때 → 10초 타이머 시작
+      // 전부 OFF + 복귀 중 아닐 때 → 유휴 타이머 시작
       idleTimerRef.current = setTimeout(() => {
         setShowWaiting(true);
-      }, 10000);
+      }, IDLE_STANDBY_RETURN_MS);
     } else if (isReturning && idleTimerRef.current) {
       // 복귀 중이면 기존 타이머 취소
       clearTimeout(idleTimerRef.current);
@@ -1577,6 +1632,27 @@ function App() {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, [anyOn, manualDriveActive, showWaiting, isReturning, serviceStateName]);
+
+  // HH_260916 - A delivery or recall is over once the robot has parked or
+  // docked at the drop zone, so hand the screen straight back to the public
+  // standby view. Nothing else did this: `intentPinnedRef` is cleared only when
+  // standby reopens, which made the drop-zone handoff below unreachable after
+  // any visitor-started mission, and a recall was refused there outright.
+  useEffect(() => {
+    if (!returnCompletionPending || missionDispatch.active) return;
+    setReturnCompletionPending(false);
+    // The visit ends here: drop the pinned role and any unfinished selection so
+    // the next visitor starts from the public service menu.
+    intentPinnedRef.current = false;
+    destinationIntentRef.current = 'delivery';
+    setDestinationIntent('delivery');
+    setActiveRecallSite(null);
+    setSelectedSite(null);
+    setArrivedSite(null);
+    setShowArrivalComplete(false);
+    setShowServiceSelection(false);
+    setShowWaiting(true);
+  }, [returnCompletionPending, missionDispatch.active]);
 
   // 충전 접점 연결을 기다리는 동안 상태 안내를 10초간 유지한 뒤 다음
   // 이용자가 터치해서 서비스를 선택할 수 있는 공용 대기 화면을 연다.
@@ -1593,7 +1669,6 @@ function App() {
       || manualDriveActive
       || isReturning
       || showWaiting
-      || showServiceSelection
     ) return undefined;
 
     const chargingSelectionTimer = setTimeout(() => {
@@ -1609,7 +1684,6 @@ function App() {
     manualDriveActive,
     isReturning,
     showWaiting,
-    showServiceSelection,
   ]);
 
   // A confirmed full battery gets its own completion presentation before the
@@ -1629,7 +1703,6 @@ function App() {
       || manualDriveActive
       || isReturning
       || showWaiting
-      || showServiceSelection
     ) return undefined;
 
     const chargeCompleteTimer = setTimeout(() => {
@@ -1646,7 +1719,6 @@ function App() {
     manualDriveActive,
     isReturning,
     showWaiting,
-    showServiceSelection,
   ]);
 
   // HJ_260804 - A Guest UI mission can start while the Robot UI is on its idle
@@ -2030,6 +2102,21 @@ function App() {
           setServiceStateDescription(String(data.service_state_description || ''));
         } else if (previousServiceState !== serviceState) {
           setServiceStateDescription('');
+        }
+        // HH_260916 - Latch the end of a visit. Reaching the stationary
+        // drop-zone state *from* a returning/parking/charging state means the
+        // robot finished parking or docking; the same state repeated as an idle
+        // heartbeat means nothing happened, so only the transition counts. The
+        // backend clears mission ownership in a later frame than this one, so
+        // the standby handoff below waits for that instead of racing it.
+        if (serviceState === SERVICE_STATE.DROP_ZONE_WAIT) {
+          if (RETURN_COMPLETION_SOURCE_STATES.has(previousServiceState)) {
+            setReturnCompletionPending(true);
+          }
+        } else if (!RETURN_COMPLETION_SOURCE_STATES.has(serviceState)) {
+          // Departure, a new site mission or an operator stop cancels the latch:
+          // it must never reopen standby over a screen that has moved on.
+          setReturnCompletionPending(false);
         }
         // HH_260908 - Arrival ends the "moving to the guest" announcement:
         // the loading-wait / return / standby screens own the display now.

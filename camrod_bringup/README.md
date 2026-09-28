@@ -141,9 +141,9 @@ field acceptance items.
 
 ![Historical 0.60 m operator docking workspace](../docs/assets/module-guides/ui/test-results/docking-workspace-20260819/operator-docking-workspace.png)
 
-![Current B8 same-anchor entry and return](../docs/assets/module-guides/bringup/test-results/b8-return-docking-20260819/b8-entry-return-summary.png)
+![Current B8 same-anchor entry and return](../docs/assets/module-guides/control/test-results/campsite-return-docking-20260819/b8-same-anchor-return.png)
 
-![Current B8 phase sequence](../docs/assets/module-guides/bringup/test-results/b8-return-docking-20260819/b8-entry-return-sequence.gif)
+![Current B8 phase sequence](../docs/assets/module-guides/control/test-results/campsite-return-docking-20260819/b8-entry-return-sequence.gif)
 
 ![Current B1-B13 full-return policy](../docs/assets/module-guides/bringup/test-results/camping-site-full-return-20260819/campsite-policy-validation.png)
 

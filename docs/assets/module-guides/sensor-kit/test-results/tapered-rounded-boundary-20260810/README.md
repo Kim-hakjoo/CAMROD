@@ -36,7 +36,7 @@ so neither contour moves independently. Candidate acceptance against a lanelet
 or obstacle grid remains the responsibility of `camrod_control`; the animation
 only explains the geometry transform.
 
-The separate [measured map-v17 ROS road record](../tapered-rounded-boundary-road-sim-20260810/README.md)
+The separate [measured map-v17 ROS road record](../../../control/test-results/tapered-rounded-boundary-road-sim-20260810/README.md)
 shows this exact contour reaching a planning-margin hold, performing bounded
 `REVERSE_YAW_RIGHT`, releasing the hold, and completing the route.
 

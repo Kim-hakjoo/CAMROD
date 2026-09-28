@@ -9,7 +9,8 @@ fi
 
 IMAGE="$1"
 shift
-CMD="$*"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+SRC_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 docker run --rm -it \
   --gpus all \
@@ -18,7 +19,8 @@ docker run --rm -it \
   --pid host \
   -e NVIDIA_VISIBLE_DEVICES=all \
   -e NVIDIA_DRIVER_CAPABILITIES=all \
-  -v "$(pwd)/..:/workspaces/camrod_ws/src:rw" \
+  -v "${SRC_ROOT}:/workspaces/camrod_ws/src:rw" \
   -w /workspaces/camrod_ws \
   "${IMAGE}" \
-  bash -lc "source /opt/ros/humble/setup.bash && colcon build --symlink-install && source install/setup.bash && ${CMD}"
+  bash -lc 'source /opt/ros/humble/setup.bash && colcon build --symlink-install && source install/setup.bash && exec "$@"' \
+  camrod-run-module "$@"

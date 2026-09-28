@@ -154,6 +154,15 @@ OCCUPANCY_CANCEL_BLOCKED_SERVICE_STATES = frozenset({
 ROADSIDE_MINIMUM_SITE_LATERAL_M = 0.20
 MAX_PENDING_SITE_ROUTE_GOALS = 32
 
+# HH_260916 - Spoken once, right before an actual drop-zone return starts.
+# `to_dropzone` literally announces the drop-zone trip, so only a caller that
+# really is leaving for the drop zone may use it.
+RETURN_TO_DROP_ZONE_VOICE_KEYS = ("navigation.to_dropzone",)
+# A recalled robot re-enters the campsite to turn around before it ever heads
+# back. camrod_voice already announces `navigation.recall_clear_site` for that
+# stationary clearance phase, so this backend stays silent there.
+RECALL_SITE_ENTRY_VOICE_KEYS: tuple = ()
+
 
 # HH_260810 - One bounded JSON contract replaces the separate Tk/RViz operator
 # viewers without changing any control or sensor-authority topic.
@@ -5031,7 +5040,11 @@ class UiBackendNode(Node):
     # ── Goal and engage publishing ────────────────────────────────────────────
 
     def _publish_camping_site_maneuver_controller_return(
-        self, source: str, *, before_release: Optional[Callable[[], None]] = None
+        self,
+        source: str,
+        *,
+        before_release: Optional[Callable[[], None]] = None,
+        voice_keys: Sequence[str] = RETURN_TO_DROP_ZONE_VOICE_KEYS,
     ) -> None:
         # HH_260910 - Every RETURN trigger (button, recall, urgent battery,
         # service-state auto-return) funnels through here, so gating this one
@@ -5040,6 +5053,11 @@ class UiBackendNode(Node):
         # needs to open engage/drive-enable right before the RETURN op passes
         # `before_release` so that opens after the same announcement too,
         # instead of racing ahead of it.
+        # HH_260916 - The RETURN operation is also how a recall asks the site
+        # controller to *enter* the campsite for its clearance/turnaround
+        # sequence. That entry is not a drop-zone return, so such a caller
+        # passes its own cue or none at all; an empty tuple releases the
+        # motion command immediately, exactly as before this parameter existed.
         def _release() -> None:
             if before_release is not None:
                 before_release()
@@ -5054,7 +5072,7 @@ class UiBackendNode(Node):
             )
 
         UiBackendNode._dispatch_after_voice(self,
-            ("navigation.to_dropzone",),
+            tuple(voice_keys),
             _release,
             label=f"return_to_drop_zone:{source}",
         )
@@ -5404,6 +5422,9 @@ class UiBackendNode(Node):
             # clearance/turnaround sequence. Its first phase is stationary and
             # announced; it alone publishes progress and the eventual route.
             # Reopen the drive gate explicitly, because arrival closed it.
+            # HH_260916 - This RETURN operation starts campsite *entry*, not the
+            # drop-zone trip, so it must not announce `to_dropzone`. That cue
+            # belongs to the explicit Return button below (recall_final_return).
             def _open_drive_gate(source: str = source) -> None:
                 if getattr(self, "publish_mission_engage_from_destination", False):
                     self._publish_mission_engage(True, source=f"{source}:recall_complete")
@@ -5415,6 +5436,7 @@ class UiBackendNode(Node):
             self._publish_camping_site_maneuver_controller_return(
                 source=f"{source}:recall_loading_complete",
                 before_release=_open_drive_gate,
+                voice_keys=RECALL_SITE_ENTRY_VOICE_KEYS,
             )
             return "recall_loading_complete"
 

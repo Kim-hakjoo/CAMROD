@@ -2,7 +2,7 @@
 
 ## Result
 
-`PASS` on amd64 ROS 2 simulation with the current user-provided map.
+`PASS` on the 2026-08-19 amd64 ROS 2 simulation with that run's user-provided map.
 
 Observed sequence:
 
@@ -23,8 +23,8 @@ dynamic subscriptions.
 
 - `b8-entry-return-report.json`: machine-readable `sim_validation_runner` output.
 - `result-summary.json`: release-critical values extracted from canonical YAML.
-- `b8-entry-return-summary.png`: static integration summary.
-- `b8-entry-return-sequence.gif`: phase animation.
+- [Static integration summary](../../../control/test-results/campsite-return-docking-20260819/b8-same-anchor-return.png): canonical controller-owned image of this same run.
+- [Phase animation](../../../control/test-results/campsite-return-docking-20260819/b8-entry-return-sequence.gif): canonical controller-owned animation of this same run.
 - `SHA256SUMS`: artifact integrity hashes.
 
 This does not claim physical charger, AprilTag depth, radar-noise, or Jetson

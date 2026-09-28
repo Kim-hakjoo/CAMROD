@@ -106,7 +106,7 @@ not from the earlier B6 browser capture or hard-coded renderer labels. -->
 
 ![Map-v14 automatic recovery rerun](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-contact-sheet.png)
 
-![Map-v14 recovery policy](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-policy.png)
+![Map-v14 recovery policy](assets/module-guides/control/test-results/automatic-recovery-v2.1.3/automatic-owner-policy.png)
 
 [Open the map-v14 reverse/retry/crab GIF](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery.gif).
 

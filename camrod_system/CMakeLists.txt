@@ -268,6 +268,17 @@ if(BUILD_TESTING)
     NAME planning_nav_status_tracker
     COMMAND test_planning_nav_status_tracker
   )
+
+  # These checks use C assert(); keep assertions active in Release builds too.
+  # Scope the override to test executables so production optimization is intact.
+  foreach(assertion_test IN ITEMS
+      test_graph_readiness
+      test_diagnostic_detail
+      test_camera_diagnostic_status
+      test_dummy_source_monitor)
+    target_compile_options(${assertion_test} PRIVATE
+      $<$<CXX_COMPILER_ID:GNU,Clang>:-UNDEBUG>)
+  endforeach()
 endif()
 
 add_executable(aggregator_node src/diagnostics/aggregator_node.cpp)

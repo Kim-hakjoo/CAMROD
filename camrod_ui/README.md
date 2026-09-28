@@ -1,5 +1,12 @@
 # camrod_ui
 
+<!-- HH_260915 - Separate persistent trip/CAN journal, preserving legacy metrics. -->
+왕복 미션·자율/수동·정지 사유·CAN 상세 기록의 기준과 실행 방법:
+[mission_recording.md](docs/mission_recording.md).
+
+현재 Jetson의 빌드·WebKit 화면·미션 기록 시나리오와 실제 캡처는
+[2026-09-15 v2.2.8 검증 기록](../docs/evidence/v2_2_8_20260915/README.md)에 있다.
+
 <!-- HH_260807 - Make the documented renderer match the WebKit field default
 while retaining the tested Chromium and auto alternatives. -->
 <!-- HH_260807 - Preserve charger-departure authorization and deduplicate destination commands. -->

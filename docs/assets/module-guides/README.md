@@ -39,6 +39,11 @@ Experiment directories should include a concise `README.md`, machine-readable
 JSON when measurements exist, and hashes for external or generated inputs.
 Large rosbags remain external; record their path and SHA-256 in the result.
 
+When two packages refer to the same image bytes, keep the image at its owning
+package and link to that path. The 2026-09-15 [cleanup manifest](../../evidence/v2_2_8_20260915/media-cleanup.json)
+records the three consolidated historical copies and their unchanged hashes.
+Distinct Robot/Guest public roots retain their required deployment logo copies.
+
 Summary animations must identify themselves when raw frame/event samples were
 not recorded. They may animate measured aggregates or unit-tested decisions,
 but must not be labelled as runtime or field captures.

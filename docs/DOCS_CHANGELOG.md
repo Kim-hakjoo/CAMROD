@@ -1,5 +1,13 @@
 # Documentation Changelog
 
+## [v2.2.8-jetson-validation] - 2026-09-15
+
+- Link the current release to [actual Jetson build/UI/scenario evidence](evidence/v2_2_8_20260915/README.md), keeping the original release author's external records separate.
+- Consolidate three exact duplicate historical PNG/GIF copies to their owner paths; preserve content hashes, experiment JSON and unique historical captures.
+- Repair two local evidence links, update SHA manifests and the module image inventory, and correct the Docker guide's file/status descriptions.
+- Bind archived map-v22 checks to their historical inputs and active checks to the adopted map-v27 snapshot; preserve rejection of mismatched evidence.
+- Support Ubuntu 22.04's Pillow constants when regenerating visual guides.
+
 ## [v2.2.5-pure-parking-planning-ui] - 2026-09-08
 
 - Document isolated detector launch arguments, bounded reverse XY completion,

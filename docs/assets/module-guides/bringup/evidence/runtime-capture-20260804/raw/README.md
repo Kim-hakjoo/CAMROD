@@ -4,7 +4,7 @@
 remove duplicated mission-role logs after their results were normalized. -->
 
 The duplicated B6/B12 node logs were removed after their outcomes were captured
-in [`campsite-smoke-20260804.json`](../campsite-smoke-20260804.json) and the
+in [`campsite-smoke-20260804.json`](../../campsite-smoke-20260804/campsite-smoke-20260804.json) and the
 module-guide figures. The remaining excerpt is directly referenced by the
 validation document and preserves the retry/stop sequence without repeated
 status lines.

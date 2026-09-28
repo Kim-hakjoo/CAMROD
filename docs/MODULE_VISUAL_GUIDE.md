@@ -85,7 +85,7 @@ Package-guide files and structured release results are under
 `docs/assets/module-guides/<package>/{guide,evidence,test-results}/`. The
 <!-- HH_260825 - Include the v2.2.1 measured safety-handoff summary in the
 exact package-owned visual inventory. -->
-checked-in inventory contains **85 PNGs and 21 GIFs** under `module-guides`; the former top-level
+checked-in inventory contains **83 PNGs and 20 GIFs** under `module-guides`; the former top-level
 `test_result` content is organized under each package's `test-results/`
 directory. Generated evidence keeps
 its source JSON/log and checksum manifest beside the visual whenever available.
@@ -239,7 +239,7 @@ route. The record explicitly carries `field_claim=false`.
 
 | Historical map-v14 measured result | Historical translation-only policy |
 |---|---|
-| ![Map-v14 recovery](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-contact-sheet.png) | ![Map-v14 recovery policy](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-policy.png) |
+| ![Map-v14 recovery](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-contact-sheet.png) | ![Map-v14 recovery policy](assets/module-guides/control/test-results/automatic-recovery-v2.1.3/automatic-owner-policy.png) |
 
 ![Map-v14 recovery animation](assets/module-guides/control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery.gif)
 

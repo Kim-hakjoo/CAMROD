@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 from PIL import Image
 
@@ -142,7 +143,6 @@ MODULE_OWNED_RELEASE_ASSETS = (
     "control/test-results/automatic-recovery-v2.1.3/automatic-owner-route-retry-contact-sheet.png",
     "control/test-results/automatic-recovery-v2.1.3/automatic-owner-route-retry.gif",
     "control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-contact-sheet.png",
-    "control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery-policy.png",
     "control/test-results/map-v14-boundary-recovery/map-v14-boundary-recovery.gif",
     "control/test-results/map-v15-boundary-recovery/map-v15-boundary-recovery-contact-sheet.png",
     "control/test-results/map-v15-boundary-recovery/map-v15-boundary-recovery-policy.png",
@@ -478,8 +478,11 @@ def test_map_v15_release_recovery_visuals_are_hash_guarded(tmp_path: Path) -> No
         text=True,
     )
     assert result.returncode != 0
+    metadata = ET.parse(active_map).getroot().find("MetaInfo")
+    assert metadata is not None
+    active_version = metadata.attrib["map_version"]
     assert (
-        "evidence map v15 does not match OSM map v22" in result.stderr
+        f"evidence map v15 does not match OSM map v{active_version}" in result.stderr
         or "evidence OSM hash does not match the selected map" in result.stderr
     )
 

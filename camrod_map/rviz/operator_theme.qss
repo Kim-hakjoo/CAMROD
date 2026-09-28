@@ -1,5 +1,6 @@
 /* camrod operator UI theme */
-QWidget {
+/* Keep backgrounds off RViz's native OpenGL render widgets. */
+QMainWindow, QDockWidget {
   background-color: #0f141a;
   color: #d8e3ee;
 }

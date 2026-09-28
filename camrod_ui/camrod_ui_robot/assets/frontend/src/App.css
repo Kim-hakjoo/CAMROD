@@ -714,6 +714,8 @@ body {
 .waiting-grid-btn {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  padding: 0.6rem;
   align-items: center;
   justify-content: center;
   gap: 0.7rem;
@@ -741,7 +743,9 @@ body {
   justify-content: center;
   width: 100%;
   height: clamp(84px, 16vmin, 210px);
-  flex-shrink: 0;
+  /* Keep the service label inside its card when the evidence strip grows. */
+  min-height: 0;
+  flex-shrink: 1;
 }
 
 .waiting-grid-btn-icon-destination {
@@ -764,10 +768,15 @@ body {
 
 
 .waiting-grid-btn-label {
+  flex-shrink: 0;
   font-size: clamp(0.9rem, 1.7vw, 1.7rem);
   font-weight: 800;
   color: #1a1a1a;
   letter-spacing: -0.01em;
+}
+
+.waiting-grid-btn .waiting-text {
+  flex-shrink: 0;
 }
 
 /* 3번째 버튼이 홀수 마지막일 때 전체 너비 사용 */

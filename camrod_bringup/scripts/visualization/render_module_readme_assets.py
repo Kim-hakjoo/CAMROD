@@ -25,6 +25,11 @@ import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
 import yaml  # noqa: E402
 
+# Ubuntu 22.04 ships Pillow 9.0, before the enum namespaces introduced in 9.1.
+# Use identical legacy values there while retaining modern Pillow support.
+ADAPTIVE_PALETTE = getattr(Image, "Palette", Image).ADAPTIVE
+LANCZOS_RESAMPLING = getattr(Image, "Resampling", Image).LANCZOS
+
 try:  # Direct source/install execution keeps the renderer helper beside this file.
     from render_tapered_rounded_boundary import make_boundaries
 except ModuleNotFoundError:  # Imported as a repository namespace module in tests.
@@ -516,7 +521,7 @@ def render_lifecycle_gif(states: list[str], descriptions: dict, output: Path):
         figure.savefig(buffer, format="png", dpi=100, facecolor=figure.get_facecolor())
         plt.close(figure)
         buffer.seek(0)
-        frames.append(Image.open(buffer).convert("P", palette=Image.Palette.ADAPTIVE))
+        frames.append(Image.open(buffer).convert("P", palette=ADAPTIVE_PALETTE))
     output.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(
         output,
@@ -2810,7 +2815,7 @@ def render_runtime_lifecycle_gif(stages, clean_runs: int, run_count: int, output
         figure.savefig(buffer, format="png", dpi=100, facecolor=figure.get_facecolor())
         plt.close(figure)
         buffer.seek(0)
-        frames.append(Image.open(buffer).convert("P", palette=Image.Palette.ADAPTIVE))
+        frames.append(Image.open(buffer).convert("P", palette=ADAPTIVE_PALETTE))
     output.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(
         output,
@@ -3088,7 +3093,7 @@ def render_package_evidence_gif(records, output: Path):
         figure.savefig(buffer, format="png", dpi=100, facecolor=figure.get_facecolor())
         plt.close(figure)
         buffer.seek(0)
-        frames.append(Image.open(buffer).convert("P", palette=Image.Palette.ADAPTIVE))
+        frames.append(Image.open(buffer).convert("P", palette=ADAPTIVE_PALETTE))
     output.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(
         output,
@@ -3329,7 +3334,7 @@ def render_ui(repo_root: Path, output_root: Path):
     )
     frames = [
         Image.open(capture_root / name).convert("RGB").resize(
-            (1280, 800), Image.Resampling.LANCZOS
+            (1280, 800), LANCZOS_RESAMPLING
         )
         for name in capture_names
     ]
