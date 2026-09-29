@@ -21,7 +21,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set
 
 import rclpy
 import yaml
@@ -29,6 +29,7 @@ from action_msgs.msg import GoalStatus, GoalStatusArray
 from action_msgs.srv import CancelGoal
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from avg_msgs.msg import (
+    AudioRequest,
     AvgAprilTagPose,
     AvgServiceState,
     AvgBool,
@@ -50,6 +51,7 @@ from avg_msgs.msg import (
     SystemStatus,
     TopicDetails,
     UiDestinationCommand,
+    VoiceState,
 )
 from avg_msgs.srv import ConfigureSnapshotTopics, EstimateSnapshot, TriggerSnapshot
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
@@ -83,6 +85,7 @@ from camrod_ui.service_metrics import (
     default_service_metrics_path,
 )
 from camrod_ui.ui_state_policy import UiStatePolicy
+from camrod_ui.voice_departure_gate import VoiceDepartureGate
 
 # HH_260721 - Keep symbolic service names stable across ROS, REST, and WebSocket clients.
 SERVICE_STATE_NAMES = {
@@ -1075,6 +1078,27 @@ class UiBackendNode(Node):
                 "/control/cmd_vel_safety_gate/status",
             ).value
         )
+        self.voice_say_topic = str(
+            self.declare_parameter(
+                "voice_say_topic", "/voice/voice_announcer/say"
+            ).value
+        )
+        self.voice_state_topic = str(
+            self.declare_parameter(
+                "voice_state_topic", "/voice/voice_announcer/state"
+            ).value
+        )
+        self.enable_voice_departure_gate = bool(
+            self.declare_parameter("enable_voice_departure_gate", True).value
+        )
+        self.voice_departure_gate_timeout_s = max(
+            0.5,
+            float(
+                self.declare_parameter(
+                    "voice_departure_gate_timeout_s", 12.0
+                ).value
+            ),
+        )
         # HH_260810 - Operator telemetry remains dormant until the authenticated
         # diagnostics modal sends a heartbeat. This avoids permanent camera and
         # point-cloud subscribers on the production Jetson.
@@ -1437,6 +1461,12 @@ class UiBackendNode(Node):
             self._on_control_gate_status,
             state_qos,
         )
+        self.sub_voice_state = self.create_subscription(
+            VoiceState,
+            self.voice_state_topic,
+            self._on_voice_state,
+            10,
+        )
         self.sub_platform_status = self.create_subscription(
             AvgPlatformStatus,
             self.platform_status_topic,
@@ -1560,6 +1590,9 @@ class UiBackendNode(Node):
             PoseStamped, self.manual_goal_pose_topic, 10
         )
         self.pub_service_state = self.create_publisher(AvgServiceState, self.service_state_topic, 10)
+        self.pub_voice_say = self.create_publisher(
+            AudioRequest, self.voice_say_topic, 10
+        )
         # HH_260727 - Runtime tuning uses the standard ROS parameter services, so the UI
         # changes the driver immediately without restarting the platform.
         self.get_ranger_parameters_client = self.create_client(
@@ -1608,6 +1641,10 @@ class UiBackendNode(Node):
         )
         self._startup_fail_closed_timer = self.create_timer(
             0.5, self._reassert_startup_fail_closed
+        )
+        self._voice_gate = VoiceDepartureGate()
+        self._voice_gate_timer = self.create_timer(
+            0.5, self._on_voice_gate_timer
         )
         if self.enable_http_server:
             self._start_fastapi_server()
@@ -1843,6 +1880,7 @@ class UiBackendNode(Node):
     def destroy_node(self) -> bool:
         # HH_260805 - Stop the HTTP event loop before ROS destroys callbacks and
         # publishers that in-flight FastAPI/WebSocket handlers may still access.
+        UiBackendNode._cancel_voice_dispatch(self, "destroy_node")
         self._cancel_pending_manual_return_transition("node_shutdown")
         self._cancel_pending_charging_departure_transition("node_shutdown")
         self._cancel_pending_redock_after_disconnect("node_shutdown")
@@ -1923,6 +1961,104 @@ class UiBackendNode(Node):
 
     def _now_s(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
+
+    def _on_voice_gate_timer(self) -> None:
+        gate = getattr(self, "_voice_gate", None)
+        if gate is not None:
+            gate.tick(self._now_s())
+
+    def _publish_voice_say(self, key: str) -> None:
+        request = AudioRequest()
+        request.key = key
+        request.priority = 1
+        request.interrupt = False
+        request.locale = ""
+        self.pub_voice_say.publish(request)
+
+    def _cancel_voice_dispatch(self, reason: str) -> None:
+        del reason
+        self._voice_dispatch_epoch = int(
+            getattr(self, "_voice_dispatch_epoch", 0)
+        ) + 1
+        gate = getattr(self, "_voice_gate", None)
+        if gate is not None:
+            gate.cancel()
+
+    def _voice_dispatch_identity(self) -> tuple:
+        return (
+            int(getattr(self, "_voice_dispatch_epoch", 0)),
+            str(getattr(self, "_active_mission_site", "")),
+            str(getattr(self, "_active_mission_source", "")),
+            int(getattr(self, "_active_mission_generation", 0)),
+            int(getattr(self, "_command_epoch", 0)),
+        )
+
+    def _dispatch_after_voice(
+        self,
+        keys: Sequence[str],
+        on_complete: Callable[[], None],
+        *,
+        label: str,
+    ) -> None:
+        gate = getattr(self, "_voice_gate", None)
+        if gate is None or not getattr(self, "enable_voice_departure_gate", True):
+            on_complete()
+            return
+        expected = UiBackendNode._voice_dispatch_identity(self)
+
+        def release_if_current() -> None:
+            def checked() -> None:
+                if expected != UiBackendNode._voice_dispatch_identity(self):
+                    self.get_logger().warn(
+                        f"discarded stale voice dispatch: {label}"
+                    )
+                    return
+                on_complete()
+
+            lock = getattr(self, "_destination_dispatch_lock", None)
+            if lock is None:
+                checked()
+            else:
+                with lock:
+                    checked()
+
+        published = gate.start(
+            keys,
+            release_if_current,
+            now_s=self._now_s(),
+            label=label,
+            timeout_s=getattr(
+                self,
+                "voice_departure_gate_timeout_s",
+                VoiceDepartureGate.DEFAULT_TIMEOUT_S,
+            ),
+            on_timeout=lambda value: self.get_logger().warn(
+                f"voice departure timeout for '{value}'; rechecking current ownership"
+            ),
+        )
+        for key in published:
+            self._publish_voice_say(key)
+
+    def _on_voice_state(self, msg: VoiceState) -> None:
+        gate = getattr(self, "_voice_gate", None)
+        if gate is None or int(msg.state) not in {
+            VoiceState.STATE_PLAYING,
+            VoiceState.STATE_IDLE,
+        }:
+            return
+        gate.on_voice_state(
+            playing=int(msg.state) == VoiceState.STATE_PLAYING,
+            current_key=str(msg.current_key),
+            now_s=self._now_s(),
+        )
+
+    def _site_departure_voice_keys(self, site: str) -> tuple[str, ...]:
+        site = str(site).strip()
+        keys = []
+        if site in getattr(self, "site_names", ()):
+            keys.append(f"navigation.site_{site}")
+        keys.append("navigation.to_campsite")
+        return tuple(keys)
 
     @staticmethod
     def _new_telemetry_snapshot() -> Dict[str, Any]:
@@ -4230,36 +4366,43 @@ class UiBackendNode(Node):
             )
             self._drop_zone_exit_waiting_for_fresh_status = True
 
-        # HH_260825 - Open authorization only after the dwell has expired, then
-        # start the departure owner. Dynamic radar/fusion cost checks stay active
-        # in EXIT_STRAIGHT and ALIGN_EXIT_YAW; only static lanelet cost is bypassed.
-        if getattr(self, "publish_engage_from_destination", False):
-            self._publish_engage(True, source=f"{source}:site_departure")
-        if getattr(self, "publish_mission_engage_from_destination", False):
-            self._publish_mission_engage(
-                True, source=f"{source}:site_departure"
+        def release() -> None:
+            # Authorization and the EXIT owner open only after the selected-site
+            # and departure announcements have completed.
+            if getattr(self, "publish_engage_from_destination", False):
+                self._publish_engage(True, source=f"{source}:site_departure")
+            if getattr(self, "publish_mission_engage_from_destination", False):
+                self._publish_mission_engage(
+                    True, source=f"{source}:site_departure"
+                )
+            if not resumed_active_departure:
+                self._publish_drop_zone_operation(
+                    MotionOperation.EXIT, source=f"{source}:site_departure"
+                )
+            departure_state = (
+                AvgServiceState.DEPARTING_CHARGER
+                if bool(getattr(self, "_charging_departure_from_charger", False))
+                or bool(getattr(self, "_latest_platform_is_charging", False))
+                else AvgServiceState.DEPARTING_DROP_ZONE
             )
-        if not resumed_active_departure:
-            self._publish_drop_zone_operation(
-                MotionOperation.EXIT, source=f"{source}:site_departure"
+            self._schedule_broadcast(
+                {
+                    "departure_delay_active": False,
+                    "departure_delay_seconds": 0.0,
+                }
             )
-        departure_state = (
-            AvgServiceState.DEPARTING_CHARGER
-            if bool(getattr(self, "_charging_departure_from_charger", False))
-            or bool(getattr(self, "_latest_platform_is_charging", False))
-            else AvgServiceState.DEPARTING_DROP_ZONE
-        )
-        self._schedule_broadcast(
-            {
-                "departure_delay_active": False,
-                "departure_delay_seconds": 0.0,
-            }
-        )
-        self._publish_service_state(
-            departure_state, source=f"{source}:drop_zone_departure"
-        )
-        self.get_logger().info(
-            f"drop-zone departure released after safety dwell: source={source}"
+            self._publish_service_state(
+                departure_state, source=f"{source}:drop_zone_departure"
+            )
+            self.get_logger().info(
+                f"drop-zone departure released after announcement: source={source}"
+            )
+
+        UiBackendNode._dispatch_after_voice(
+            self,
+            UiBackendNode._site_departure_voice_keys(self, pending[0]),
+            release,
+            label=f"drop_zone_departure:{pending[0]}",
         )
         return True
 
@@ -6075,6 +6218,8 @@ class UiBackendNode(Node):
             return claim()
 
     def _clear_active_mission_identity(self) -> None:
+        UiBackendNode._cancel_voice_dispatch(self, "_clear_active_mission_identity")
+
         def clear() -> None:
             self._battery_return_urgent = False
             self._urgent_return_after_departure = False
@@ -6369,6 +6514,7 @@ class UiBackendNode(Node):
         self, source: str, *, publish_service_state: bool = True
     ) -> None:
         # HH_260724 - Stop/cancel is a state transition, not only a command-gate update.
+        UiBackendNode._cancel_voice_dispatch(self, "_stop_active_service_serialized")
         self._battery_return_urgent = False
         self._urgent_return_after_departure = False
         self._urgent_return_generation = 0
@@ -7180,22 +7326,38 @@ class UiBackendNode(Node):
                 ),
             }
 
-        if self.publish_engage_from_destination:
-            self._publish_engage(True, source=f"{source}:destination")
-        if self.publish_mission_engage_from_destination:
-            self._publish_mission_engage(True, source=f"{source}:destination")
-        self._publish_service_state(AvgServiceState.MOVING_TO_SITE, source=f"{source}:start")
-        goal_result = self._publish_goal_for_site(site=site, source=source)
+        goal_result: Dict[str, Any] = {}
+
+        def release() -> None:
+            if self.publish_engage_from_destination:
+                self._publish_engage(True, source=f"{source}:destination")
+            if self.publish_mission_engage_from_destination:
+                self._publish_mission_engage(True, source=f"{source}:destination")
+            self._publish_service_state(
+                AvgServiceState.MOVING_TO_SITE, source=f"{source}:start"
+            )
+            goal_result.update(self._publish_goal_for_site(site=site, source=source))
+
+        UiBackendNode._dispatch_after_voice(
+            self,
+            UiBackendNode._site_departure_voice_keys(self, site),
+            release,
+            label=f"site_departure:{site}",
+        )
         return {
             "site": site,
             "run": True,
-            "mission_key": goal_result.get("mission_key", ""),
+            "mission_key": goal_result.get("mission_key", mission_key),
             "goal_pose_published": bool(goal_result.get("goal_pose_published", False)),
             "recall_request_published": False,
             "mission_generation": generation,
             "owner": UiBackendNode._destination_request_owner(source),
             "intent": UiBackendNode._destination_request_intent(source),
-            "message": str(goal_result.get("message", "ok")),
+            "message": str(
+                goal_result.get(
+                    "message", "site goal accepted, pending voice announcement"
+                )
+            ),
         }
 
     def _is_recent_direct_destination_echo(self, site: str, run: bool, source: str) -> bool:

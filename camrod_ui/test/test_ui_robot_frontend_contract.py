@@ -129,14 +129,14 @@ class RobotUiFrontendContractTest(unittest.TestCase):
         self.assertIn("setShowServiceSelection(true);", confirm)
         self.assertIn("setShowWaiting(false);", confirm)
 
-    def test_parking_and_charging_lifecycle_has_distinct_english_labels(self) -> None:
+    def test_parking_and_charging_lifecycle_has_distinct_korean_labels(self) -> None:
         for label in (
-            "Charging",
-            "Waiting for charging connection",
-            "Parking in progress",
-            "Docking in progress",
-            "Drop-zone parking in progress",
-            "Parked at drop zone",
+            "충전 중",
+            "충전 접점 연결 대기 중",
+            "후진 주차 중",
+            "충전 도킹 중",
+            "대기·충전 장소 주차 중",
+            "대기·충전 장소 주차 완료",
         ):
             self.assertIn(label, self.source)
         self.assertIn("parkingLifecycleStatus(", self.source)
@@ -589,6 +589,15 @@ class RobotUiFrontendContractTest(unittest.TestCase):
         self.assertIn("현재 운행의 복귀 권한이 이 화면에 없습니다.", handler)
         self.assertNotIn("setIsReturning(true)", handler)
         self.assertIn("wsRef.current.readyState !== WebSocket.OPEN", handler)
+        self.assertNotIn("setShowArrivalComplete(false)", handler)
+        self.assertIn("Keep the completion window open", handler)
+
+        lifecycle_start = self.source.index("if ('service_state' in data)")
+        lifecycle_end = self.source.index("if ('system_health' in data)", lifecycle_start)
+        lifecycle = self.source[lifecycle_start:lifecycle_end]
+        self.assertIn("const recallTurnaroundInProgress", lifecycle)
+        self.assertIn("!recallFinalReturnReadyRef.current", lifecycle)
+        self.assertIn("if (!recallTurnaroundInProgress)", lifecycle)
 
     @unittest.skipUnless(shutil.which("node"), "Node.js is required for frontend behavior checks")
     def test_recall_return_progress_matches_both_uis_for_every_site(self) -> None:
@@ -831,7 +840,7 @@ process.stdout.write(JSON.stringify({robot, guest, urgent}));
 """
         result = subprocess.run(["node"], input=script, text=True, capture_output=True, check=True)
         output = json.loads(result.stdout)
-        self.assertIn("pending", output["robot"][0]["label"])
+        self.assertIn("확인 중", output["robot"][0]["label"])
         for index in (1, 2):
             self.assertIn("긴급 복귀", output["robot"][index]["label"])
             self.assertIn("25% 미만", output["guest"][index])
@@ -1021,8 +1030,8 @@ process.stdout.write(JSON.stringify({robot, guest, urgent}));
     def test_docking_view_shows_exact_lanelet_parking_approach(self) -> None:
         for token in (
             "drop_zone_parking",
-            "Lanelet parking point",
-            "Exact lanelet point",
+            "차로 기반 주차 지점",
+            "정확한 차로 지점",
             "docking-path-approach",
         ):
             self.assertIn(token, self.telemetry_source)

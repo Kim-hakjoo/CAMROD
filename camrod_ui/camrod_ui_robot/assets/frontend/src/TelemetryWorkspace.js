@@ -99,7 +99,7 @@ export function DockingCommandButton({ className = 'manual-return-btn', disabled
   };
   return <>
     <button type="button" className={className} onClick={requestDocking} disabled={disabled || pending || !stationAllowed}
-      title={stationAllowed ? '자동 주차 정책과 별도로 충전 요청' : '충전은 drop_zone 정차·주차 상태에서만 가능합니다'}>
+      title={stationAllowed ? '자동 주차 정책과 별도로 충전 요청' : '충전은 대기·충전 장소에 정차하거나 주차 중일 때만 가능합니다'}>
       {pending ? '충전 요청 중' : '충전'}
     </button>
     {status && <span className="manual-motion-status" role="status">{status}</span>}
@@ -1089,7 +1089,7 @@ function DockingPathPlot({ telemetry }) {
   if (all.length < 2) {
     return (
       <div className="docking-path-empty">
-        <strong>NO PARKING PATH</strong>
+        <strong>주차 경로 없음</strong>
         <span>주차 컨트롤러 경로 토픽 대기 중</span>
       </div>
     );
@@ -1114,7 +1114,7 @@ function DockingPathPlot({ telemetry }) {
     ? tagGuided : (reverse.length > 0 ? reverse : approach);
   const [targetX, targetY] = toScreen(lastPath[lastPath.length - 1]);
   return (
-    <svg className="docking-path-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Parking controller approach trajectories">
+    <svg className="docking-path-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="주차 제어기 진입 경로">
       <defs>
         <pattern id="dockingGrid" width="38" height="38" patternUnits="userSpaceOnUse">
           <path d="M 38 0 L 0 0 0 38" className="docking-grid-line" />
@@ -1180,12 +1180,12 @@ function DockingView({ telemetry, redockStatus = null, parkingPolicy = {}, servi
   return (
     <div className="telemetry-view telemetry-docking-view">
       <div className="telemetry-source-row">
-        <SourcePill telemetry={telemetry} source="camera.docking" label="AprilTag debug" staleAfter={3} />
-        <SourcePill telemetry={telemetry} source="docking.tag_detected" label="Tag detection" />
-        <SourcePill telemetry={telemetry} source="docking.tag_pose" label="Tag pose" />
-        <SourcePill telemetry={telemetry} source="platform.velocity" label="Charging CAN" />
-        <SourcePill telemetry={telemetry} source="controller.apriltag_parking" label="Docking controller" />
-        <SourcePill telemetry={telemetry} source="controller.reverse_parking" label="Parking controller" />
+        <SourcePill telemetry={telemetry} source="camera.docking" label="AprilTag 디버그" staleAfter={3} />
+        <SourcePill telemetry={telemetry} source="docking.tag_detected" label="태그 감지" />
+        <SourcePill telemetry={telemetry} source="docking.tag_pose" label="태그 자세" />
+        <SourcePill telemetry={telemetry} source="platform.velocity" label="충전 CAN" />
+        <SourcePill telemetry={telemetry} source="controller.apriltag_parking" label="도킹 제어기" />
+        <SourcePill telemetry={telemetry} source="controller.reverse_parking" label="주차 제어기" />
       </div>
       <div className="docking-command-bar">
         <button
@@ -1201,39 +1201,39 @@ function DockingView({ telemetry, redockStatus = null, parkingPolicy = {}, servi
       </div>
       <p className="manual-motion-status" role="status">{parkingPolicyMessage(parkingPolicy)}</p>
       <div className="docking-layout">
-        <CameraFeed telemetry={telemetry} camera="docking" label="AprilTag docking debug" />
+        <CameraFeed telemetry={telemetry} camera="docking" label="AprilTag 도킹 디버그" />
         <section className="telemetry-section docking-status-section">
-          <SectionHeader title="Docking state" meta={mission.service_state_name || 'service state unavailable'} />
+          <SectionHeader title="도킹 상태" meta={mission.service_state_name || '서비스 상태 정보 없음'} />
           <div className="docking-state-banner">
             <div className={docking.tag_detected ? 'detected' : 'missing'}>
-              <span>TAG</span><strong>{docking.tag_detected ? 'DETECTED' : 'NOT DETECTED'}</strong>
+              <span>태그</span><strong>{docking.tag_detected ? '감지됨' : '감지되지 않음'}</strong>
             </div>
             <div className={docking.is_charging ? 'charging' : 'idle'}>
-              <span>CHARGING</span><strong>{docking.is_charging ? 'TRUE · STOP' : 'FALSE'}</strong>
+              <span>충전</span><strong>{docking.is_charging ? '충전 중 · 정차' : '충전 안 함'}</strong>
             </div>
           </div>
           <div className="telemetry-metric-grid telemetry-metric-grid-3">
-            <Metric label="Tag distance" value={numberText(tag.distance_m, 3)} unit="m" tone={docking.tag_detected ? 'ok' : 'warn'} />
-            <Metric label="Camera X" value={numberText(tag.x_m, 3)} unit="m" />
-            <Metric label="Camera Y" value={numberText(tag.y_m, 3)} unit="m" />
-            <Metric label="Camera Z" value={numberText(tag.z_m, 3)} unit="m" />
-            <Metric label="Tag yaw" value={numberText(tag.yaw_deg, 1)} unit="°" />
-            <Metric label="Battery" value={numberText(docking.battery_percentage, 1)} unit="%" />
+            <Metric label="태그 거리" value={numberText(tag.distance_m, 3)} unit="m" tone={docking.tag_detected ? 'ok' : 'warn'} />
+            <Metric label="카메라 X" value={numberText(tag.x_m, 3)} unit="m" />
+            <Metric label="카메라 Y" value={numberText(tag.y_m, 3)} unit="m" />
+            <Metric label="카메라 Z" value={numberText(tag.z_m, 3)} unit="m" />
+            <Metric label="태그 방향" value={numberText(tag.yaw_deg, 1)} unit="°" />
+            <Metric label="배터리" value={numberText(docking.battery_percentage, 1)} unit="%" />
           </div>
           <div className="docking-controller-list">
-            <div><span>Lanelet parking point</span><strong>{dropZone.operating_state || 'NO DATA'}</strong><em>{dropZone.message || '-'}</em></div>
-            <div><span>Docking</span><strong>{april.operating_state || 'NO DATA'}</strong><em>{april.message || '-'}</em></div>
-            <div><span>Reverse parking</span><strong>{reverse.operating_state || 'NO DATA'}</strong><em>{reverse.message || '-'}</em></div>
+            <div><span>차로 기반 주차 지점</span><strong>{dropZone.operating_state || '데이터 없음'}</strong><em>{dropZone.message || '-'}</em></div>
+            <div><span>충전 도킹</span><strong>{april.operating_state || '데이터 없음'}</strong><em>{april.message || '-'}</em></div>
+            <div><span>후진 주차</span><strong>{reverse.operating_state || '데이터 없음'}</strong><em>{reverse.message || '-'}</em></div>
           </div>
         </section>
         <section className="telemetry-section docking-path-section">
-          <SectionHeader title="Parking approach path" meta="controller output" />
+          <SectionHeader title="주차 진입 경로" meta="제어기 출력" />
           <DockingPathPlot telemetry={telemetry} />
           <div className="telemetry-legend-row">
-            <span><i className="legend-docking-approach" />Exact lanelet point</span>
-            <span><i className="legend-docking-reverse" />Reverse parking</span>
-            <span><i className="legend-docking-tag" />AprilTag docking</span>
-            <span><i className="legend-docking-target" />Target</span>
+            <span><i className="legend-docking-approach" />정확한 차로 지점</span>
+            <span><i className="legend-docking-reverse" />후진 주차</span>
+            <span><i className="legend-docking-tag" />AprilTag 도킹</span>
+            <span><i className="legend-docking-target" />목표</span>
           </div>
         </section>
       </div>
